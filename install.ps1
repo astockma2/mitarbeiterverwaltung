@@ -111,38 +111,32 @@ if ($adChoice -eq "j") {
     $AdBindPw = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($AdBindPw))
 }
 
-$envContent = @"
-# === Datenbank ===
-DB_USE_SQLITE=false
-DB_HOST=db
-DB_PORT=5432
-DB_NAME=mitarbeiterverwaltung
-DB_USER=postgres
-DB_PASSWORD=$DbPassword
-
-# === Redis ===
-REDIS_URL=redis://redis:6379/0
-
-# === JWT ===
-JWT_SECRET_KEY=$JwtSecret
-JWT_ACCESS_TOKEN_EXPIRE_MINUTES=15
-JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
-
-# === Active Directory ===
-AD_ENABLED=$AdEnabled
-AD_SERVER=$AdServer
-AD_BASE_DN=$AdBaseDn
-AD_BIND_DN=$AdBindDn
-AD_BIND_PASSWORD=$AdBindPw
-
-# === App ===
-APP_ENV=production
-APP_DEBUG=false
-CORS_ORIGINS=https://$ServerHost
-SERVER_HOST=$ServerHost
-"@
-
-$envContent | Out-File -FilePath ".env" -Encoding utf8
+$envLines = @(
+    "DB_USE_SQLITE=false",
+    "DB_HOST=db",
+    "DB_PORT=5432",
+    "DB_NAME=mitarbeiterverwaltung",
+    "DB_USER=postgres",
+    "DB_PASSWORD=$DbPassword",
+    "",
+    "REDIS_URL=redis://redis:6379/0",
+    "",
+    "JWT_SECRET_KEY=$JwtSecret",
+    "JWT_ACCESS_TOKEN_EXPIRE_MINUTES=15",
+    "JWT_REFRESH_TOKEN_EXPIRE_DAYS=7",
+    "",
+    "AD_ENABLED=$AdEnabled",
+    "AD_SERVER=$AdServer",
+    "AD_BASE_DN=$AdBaseDn",
+    "AD_BIND_DN=$AdBindDn",
+    "AD_BIND_PASSWORD=$AdBindPw",
+    "",
+    "APP_ENV=production",
+    "APP_DEBUG=false",
+    "CORS_ORIGINS=https://$ServerHost",
+    "SERVER_HOST=$ServerHost"
+)
+$envLines -join "`n" | Out-File -FilePath ".env" -Encoding utf8 -NoNewline
 Write-Host "  OK Konfiguration gespeichert" -ForegroundColor Green
 
 # 5. TLS
