@@ -31,14 +31,15 @@ Die Mitarbeiterverwaltung ist eine On-Premise-Webanwendung fuer die IKK Kliniken
 3. [Tech-Stack](#3-tech-stack)
 4. [Backend](#4-backend)
 5. [Frontend](#5-frontend)
-6. [Mobile App](#6-mobile-app)
+6. [Mobile App (Android & iOS)](#6-mobile-app-android--ios)
 7. [Datenbank](#7-datenbank)
 8. [Authentifizierung und Rollen](#8-authentifizierung-und-rollen)
 9. [API-Referenz](#9-api-referenz)
 10. [Geschaeftslogik im Detail](#10-geschaeftslogik-im-detail)
 11. [Deployment (Produktion)](#11-deployment-produktion)
 12. [Aktueller Projektstand](#12-aktueller-projektstand)
-13. [Bekannte Einschraenkungen](#13-bekannte-einschraenkungen)
+13. [Dienste, Ports und Firewall](#13-dienste-ports-und-firewall)
+14. [Bekannte Einschraenkungen](#14-bekannte-einschraenkungen)
 
 ---
 
@@ -268,31 +269,136 @@ npm run preview   # Produktions-Build lokal testen
 
 ---
 
-## 6. Mobile App
+## 6. Mobile App (Android & iOS)
 
-Die mobile App wird mit Flutter (Dart) entwickelt und befindet sich in einem fruehen Stadium.
+Eine gemeinsame Flutter/Dart-Codebase fuer Android und iOS. Die App richtet sich an alle Mitarbeiter und bietet die wichtigsten Funktionen fuer den Arbeitsalltag im Krankenhaus.
 
-### Geplante Screens
+### 6.1 Funktionsumfang
 
 | Screen | Beschreibung |
 |---|---|
-| Login | Anmeldung, Token in Secure Storage |
-| Dashboard | Uebersicht mit Schnellzugriff |
-| Zeitstempel | Kommen/Gehen per App |
-| Dienstplan | Eigener Schichtplan anzeigen |
-| Abwesenheiten | Urlaub beantragen, Status einsehen |
-| Chat | Nachrichten senden und empfangen |
-| Profil | Eigene Daten einsehen und aendern |
+| **Login** | Anmeldung mit Benutzername/Passwort, Token in Secure Storage |
+| **Profil** | Tageszeitabhaengige Begruessung, taeglicher Motivationsspruch (75 Sprueche), Monats-Arbeitszeitkarte mit Fortschrittsbalken, Personalnummer, Abmelden |
+| **Zeiterfassung** | Grosser Ein-/Ausstempel-Button, Live-Uhrzeit (sekundengenau), laufende Arbeitszeit seit Einstempeln, Restzeit-Countdown bis Tages-Soll, Tagesuebersicht mit Stunden/Pause/Eintraegen, Pauseneingabe per Slider/Schnellauswahl |
+| **Dienstplan** | Eigener Schichtplan als Kalenderansicht, Schichtdetails (Name, Zeiten, Farbe) |
+| **Abwesenheiten** | Urlaub/Krankheit/Fortbildung beantragen, Urlaubskonto einsehen, Status verfolgen |
+| **Chat** | Echtzeit-Nachrichten per WebSocket, Einzel- und Gruppenchats, Online-Status, Tipp-Anzeige |
 
-### State Management
+### 6.2 Navigation
 
-- **Provider-Pattern** fuer globalen Zustand
-- **AuthProvider** verwaltet Login-Session und Token-Refresh
-- **flutter_secure_storage** fuer sichere Token-Speicherung
+5-Tab-Navigation am unteren Bildschirmrand:
 
-### Aktueller Stand
+```
+[ Profil ] [ Stempeln ] [ Dienstplan ] [ Abwesend ] [ Chat ]
+```
 
-Die App-Struktur (Screens, Services, Models) ist angelegt. API-Endpunkte sind im `ApiService` definiert. Die plattformspezifische Konfiguration (Android/iOS Build) steht noch aus.
+### 6.3 Technische Details
+
+| Bereich | Technologie |
+|---|---|
+| Framework | Flutter 3 / Dart |
+| State Management | Provider-Pattern (`AuthProvider`) |
+| HTTP-Client | `http`-Package mit JWT-Bearer-Token |
+| Token-Speicherung | `flutter_secure_storage` (Keychain/Keystore) |
+| WebSocket | `web_socket_channel` fuer Echtzeit-Chat |
+| Datumsformatierung | `intl`-Package (Deutsch) |
+| Pull-to-Refresh | `pull_to_refresh_flutter3` |
+
+### 6.4 Android-App
+
+**Lokaler Build:**
+```bash
+cd Mitarbeiterverwaltung/mobile
+flutter build apk --release
+```
+
+**CI/CD Build (GitHub Actions):**
+Der Android-Build laeuft automatisch bei Push auf `master` (Pfad `mobile/**`) oder per manueller Ausloesung. Workflow: `.github/workflows/build-ios.yml` (Job `build-android`).
+
+**Ausgabe:** `build/app/outputs/flutter-apk/app-release.apk` (~50 MB)
+
+**Fertige APK:** `releases/app-release.apk` (aus GitHub Actions heruntergeladen)
+
+**Installation:**
+- APK per USB, E-Mail oder internen Fileserver an Geraete verteilen
+- Auf dem Android-Geraet: "Aus unbekannten Quellen installieren" erlauben
+- Alternativ: Google Play Store (interner Track) oder MDM-System (z.B. Intune)
+
+**Voraussetzungen:**
+- Android 5.0 (API 21) oder hoeher
+- Internetzugang zum Backend-Server (internes WLAN)
+
+**Konfiguration:**
+- Server-URL in `lib/services/api_service.dart` (`baseUrl`) anpassen
+- Fuer Produktion: `android:usesCleartextTraffic="false"` in `AndroidManifest.xml` setzen
+
+### 6.5 iOS-App (iPhone/iPad)
+
+**CI/CD Build (GitHub Actions):**
+Der iOS-Build laeuft auf einem macOS-Runner via GitHub Actions. Workflow: `.github/workflows/build-ios.yml` (Job `build-ios`). Der Build wird automatisch bei Push auf `master` (Pfad `mobile/**`) oder manuell ausgeloest.
+
+```bash
+# Manuell ausloesen:
+gh workflow run build-ios.yml
+```
+
+**Lokaler Build (nur auf macOS moeglich):**
+```bash
+cd Mitarbeiterverwaltung/mobile
+flutter build ios --release --no-codesign   # ohne Signierung
+flutter build ipa --release                  # mit Signierung (erfordert Apple Developer Account)
+```
+
+**Ausgabe:** `build/ios/ipa/mitarbeiterverwaltung.ipa` (~7 MB)
+
+**Fertige IPA:** `releases/mitarbeiterverwaltung.ipa` (aus GitHub Actions heruntergeladen, unsigniert)
+
+**Wichtig:** Der iOS-Build ist **nur auf macOS** moeglich (Apple-Einschraenkung). Deshalb wird GitHub Actions mit macOS-Runner verwendet.
+
+**Aktueller Stand:** Die IPA wird ohne Code-Signierung gebaut (`--no-codesign`). Fuer die Installation auf echten Geraeten ist ein Apple Developer Account ($99/Jahr) erforderlich.
+
+**Verteilung (mit Apple Developer Account):**
+- **TestFlight** — fuer interne Tests (bis 10.000 Tester)
+- **Apple Business Manager** — fuer firmeninterne Verteilung ohne App Store
+- **MDM-System** — Push per Intune, Jamf o.ae.
+
+**iOS-spezifische Konfiguration:**
+- Bundle-ID in `ios/Runner.xcodeproj` setzen (z.B. `de.ikk-kliniken.mitarbeiterverwaltung`)
+- App Transport Security (ATS): HTTPS ist Pflicht, HTTP wird von iOS blockiert
+- Push-Notifications: APNs-Zertifikat im Apple Developer Portal erstellen
+
+### 6.8 CI/CD-Pipeline (GitHub Actions)
+
+**Workflow:** `.github/workflows/build-ios.yml`
+
+| Job | Runner | Dauer | Artefakt |
+|---|---|---|---|
+| `build-ios` | `macos-latest` | ~3-4 Min | `ios-release-ipa` (IPA) |
+| `build-android` | `ubuntu-latest` | ~6 Min | `android-release-apk` (APK) |
+
+**Trigger:**
+- Automatisch bei Push auf `master` mit Aenderungen unter `mobile/**`
+- Manuell per `workflow_dispatch` (GitHub UI oder `gh workflow run`)
+
+**Artefakte:** Werden 30 Tage auf GitHub gespeichert und koennen unter Actions → Run → Artifacts heruntergeladen werden. Aktuelle Builds liegen auch lokal unter `releases/`.
+
+### 6.6 Gemeinsame Konfiguration (beide Plattformen)
+
+Die Server-URL muss vor dem Build angepasst werden:
+
+```dart
+// lib/services/api_service.dart
+static String baseUrl = 'https://mitarbeiter.klinik.local/api/v1';
+```
+
+**Empfehlung fuer Produktion:** URL ueber eine Konfigurationsdatei oder Build-Flavors steuern, damit Dev- und Prod-Builds getrennt sind.
+
+### 6.7 Offline-Verhalten
+
+Die App benoetigt eine aktive Netzwerkverbindung. Es gibt aktuell keinen Offline-Modus. Bei Verbindungsverlust:
+- Stempelversuche schlagen fehl mit Fehlermeldung
+- Chat-WebSocket verbindet sich nicht automatisch neu
+- Gespeicherte Tokens bleiben erhalten (kein erneuter Login noetig)
 
 ---
 
@@ -645,7 +751,7 @@ CORS_ORIGINS=https://mitarbeiter.klinik.local
 | Docker-Deployment | ✅ | — | — | Konfiguriert, nicht in Produktion getestet |
 | Alembic-Migrationen | ⚙️ | — | — | Konfiguriert, keine Migrationsdateien erstellt |
 | Tests | ⚠️ | — | — | Nur Beispielstruktur, keine echten Tests |
-| Mobile App (Build/Plattform) | — | — | ⚠️ | Struktur vorhanden, kein Build |
+| Mobile App (Build/Plattform) | — | — | ✅ | Android APK + iOS IPA via GitHub Actions |
 
 ### Entwicklungsphasen (aus Architekturplan)
 
@@ -654,20 +760,103 @@ CORS_ORIGINS=https://mitarbeiter.klinik.local
 | **Phase 1** | Backend-Grundgeruest, Auth, Mitarbeiterverwaltung, Web-Admin | ✅ Abgeschlossen |
 | **Phase 2** | Zeiterfassung (Stempeln, Berechnung, Korrekturen) | ✅ Abgeschlossen |
 | **Phase 3** | Schichtplanung (Vorlagen, Zuweisung, Regelwerk) | ✅ Abgeschlossen |
-| **Phase 4** | Mobile App (Login, Zeitstempel, Dienstplan, Self-Service) | 🔄 In Arbeit (Struktur steht) |
+| **Phase 4** | Mobile App (Login, Zeitstempel, Dienstplan, Self-Service) | ✅ Abgeschlossen (Android + iOS Build) |
 | **Phase 5** | Chat und Kommunikation (WebSocket, Push) | ✅ Abgeschlossen (ohne Push) |
 | **Phase 6** | Loga-Export, Monatsabschluss, Auswertungen | ✅ Abgeschlossen |
 | **Phase 7** | Test, Bugfixes, Betriebsrat-Abstimmung, Rollout | ⏳ Ausstehend |
 
 ---
 
-## 13. Bekannte Einschraenkungen
+## 13. Dienste, Ports und Firewall
+
+### Diensteuebersicht
+
+| Dienst | Technologie | Port | Protokoll | Beschreibung |
+|---|---|---|---|---|
+| **PostgreSQL** | postgres:16-alpine | 5432 | TCP | Datenbank (nur Produktion, Entwicklung nutzt SQLite) |
+| **Redis** | redis:7-alpine | 6379 | TCP | Cache und Message-Broker fuer Celery |
+| **Backend API** | FastAPI + Uvicorn | 8000 | TCP (HTTP) | REST-API und WebSocket-Endpunkt |
+| **Frontend** | React + Vite | 3000 | TCP (HTTP) | Web-Oberflaeche (nur Entwicklung, in Produktion ueber nginx) |
+| **Celery Worker** | Python + Celery | — | — | Hintergrund-Tasks (kein eigener Port) |
+| **nginx** | nginx (Produktion) | 443 / 80 | TCP (HTTPS/HTTP) | Reverse Proxy mit TLS-Terminierung |
+
+### Abhaengigkeiten und Startreihenfolge
+
+```
+1. PostgreSQL (Port 5432)     ← muss zuerst laufen
+2. Redis (Port 6379)          ← muss zuerst laufen
+3. Backend API (Port 8000)    ← wartet auf PostgreSQL + Redis
+4. Celery Worker              ← wartet auf PostgreSQL + Redis
+5. Frontend (Port 3000)       ← braucht Backend API
+6. Mobile App                 ← braucht Backend API (ueber Netzwerk)
+```
+
+### Firewall-Regeln
+
+#### Entwicklung (lokaler Rechner)
+
+Alle Dienste laufen auf `localhost` — keine Firewall-Freigabe noetig.
+
+#### Produktion (On-Premise Server)
+
+| Regel | Port | Richtung | Quelle → Ziel | Zweck |
+|---|---|---|---|---|
+| HTTPS Web-Frontend | **443** | Eingehend | Klinik-Netz → Server | Web-Zugriff (nginx) |
+| HTTP-Redirect | **80** | Eingehend | Klinik-Netz → Server | Weiterleitung auf HTTPS |
+| Backend API | **8000** | Eingehend | Klinik-WLAN → Server | Mobile App Zugriff (falls kein nginx-Proxy) |
+| WebSocket | **8000** | Eingehend | Klinik-WLAN → Server | Chat-Echtzeit (ueber selben Port wie API) |
+| LDAP/AD | **389** | Ausgehend | Server → Domain Controller | Active-Directory-Authentifizierung |
+| LDAPS/AD | **636** | Ausgehend | Server → Domain Controller | AD ueber SSL (empfohlen) |
+| DNS | **53** | Ausgehend | Server → DNS-Server | Namensaufloesung |
+
+> **Hinweis:** PostgreSQL (5432) und Redis (6379) sollten **nicht** von aussen erreichbar sein. Diese Ports nur auf `localhost` oder im Docker-Netzwerk oeffnen.
+
+#### Empfohlene Architektur mit nginx
+
+```
+Internet / Klinik-Netz
+        │
+   Port 443 (HTTPS)
+        │
+    ┌───▼───┐
+    │ nginx │  ← TLS-Terminierung, statische Frontend-Dateien
+    └───┬───┘
+        │
+   Port 8000 (intern)
+        │
+    ┌───▼────┐
+    │ Backend│ → PostgreSQL (5432, intern)
+    │ FastAPI│ → Redis (6379, intern)
+    └────────┘
+```
+
+Bei dieser Architektur muss **nur Port 443** in der Firewall freigegeben werden. Die Mobile App verbindet sich ebenfalls ueber `https://mitarbeiter.klinik.local/api/v1`.
+
+### Startskripte
+
+Zum Starten und Beenden aller Dienste liegen Batch-Dateien im Projektordner:
+
+| Datei | Beschreibung |
+|---|---|
+| `start.bat` | Startet alle Dienste (Backend + Frontend + Cloudflare Tunnel) |
+| `stop.bat` | Beendet alle Dienste sauber (inkl. Tunnel) |
+
+Aufruf:
+```bash
+cd Mitarbeiterverwaltung
+start.bat       # Alles starten
+stop.bat        # Alles beenden
+```
+
+---
+
+## 14. Bekannte Einschraenkungen
 
 | Thema | Beschreibung | Prioritaet |
 |---|---|---|
 | **Keine Tests** | Nur Beispielstruktur vorhanden, keine Unit- oder Integrationstests | Hoch |
 | **Keine Alembic-Migrationen** | Tabellen werden per `create_all()` erstellt — fuer Produktion muessen Migrationen angelegt werden | Hoch |
-| **Mobile App nicht buildbar** | Flutter-Struktur steht, aber Android/iOS-Plattformkonfiguration fehlt | Mittel |
+| **iOS ohne Code-Signierung** | IPA wird ohne Signierung gebaut — fuer echte Geraete ist ein Apple Developer Account ($99/Jahr) noetig | Niedrig |
 | **Datei-Upload im Chat** | Nachrichtentypen IMAGE/FILE sind definiert, aber Upload-Logik fehlt | Mittel |
 | **Vertretung/Tausch im Frontend** | Backend-Endpunkte existieren, aber kein UI dafuer | Mittel |
 | **Push-Benachrichtigungen** | Firebase Cloud Messaging ist geplant aber nicht implementiert | Mittel |

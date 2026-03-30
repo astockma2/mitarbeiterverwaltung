@@ -437,6 +437,8 @@ async def list_chat_employees(
             "id": e.id,
             "name": f"{e.first_name} {e.last_name}",
             "role": e.role.value if hasattr(e.role, 'value') else e.role,
+            "department_id": e.department_id,
+            "department_name": e.department.name if e.department else None,
             "online": e.id in online,
         }
         for e in employees

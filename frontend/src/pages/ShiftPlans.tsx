@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Plus, Calendar, CheckCircle, Eraser, MousePointer } from 'lucide-react';
+import { Plus, Calendar, CheckCircle, Eraser, MousePointer, Settings, Pencil, Trash2 } from 'lucide-react';
 import Card, { Badge } from '../components/Card';
 import {
   getShiftPlans, getShiftTemplates, viewShiftPlan, getEmployees,
-  getDepartments,
+  getDepartments, createShiftTemplate, updateShiftTemplate, deleteShiftTemplate,
 } from '../services/api';
 import api from '../services/api';
 
@@ -39,6 +39,62 @@ export default function ShiftPlans() {
   const draggedCells = useRef<Set<string>>(new Set());
   const [highlightCells, setHighlightCells] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+
+  // Schichtvorlagen-Verwaltung
+  const [showTemplateManager, setShowTemplateManager] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<any>(null);
+  const [templateForm, setTemplateForm] = useState({
+    name: '', short_code: '', start_time: '06:00', end_time: '14:00',
+    break_minutes: 30, crosses_midnight: false, color: '#3B82F6',
+  });
+  const [templateError, setTemplateError] = useState('');
+
+  const openTemplateEdit = (t?: any) => {
+    if (t) {
+      setEditingTemplate(t);
+      setTemplateForm({
+        name: t.name, short_code: t.short_code, start_time: t.start_time,
+        end_time: t.end_time, break_minutes: t.break_minutes,
+        crosses_midnight: t.crosses_midnight, color: t.color,
+      });
+    } else {
+      setEditingTemplate(null);
+      setTemplateForm({
+        name: '', short_code: '', start_time: '06:00', end_time: '14:00',
+        break_minutes: 30, crosses_midnight: false, color: '#3B82F6',
+      });
+    }
+    setTemplateError('');
+  };
+
+  const saveTemplate = async () => {
+    setTemplateError('');
+    if (!templateForm.name || !templateForm.short_code) {
+      setTemplateError('Name und Kuerzel sind Pflichtfelder');
+      return;
+    }
+    try {
+      if (editingTemplate) {
+        await updateShiftTemplate(editingTemplate.id, templateForm);
+      } else {
+        await createShiftTemplate(templateForm);
+      }
+      setEditingTemplate(null);
+      load();
+    } catch (err: any) {
+      setTemplateError(err.response?.data?.detail || 'Fehler beim Speichern');
+    }
+  };
+
+  const removeTemplate = async (id: number) => {
+    if (!confirm('Schichtvorlage wirklich loeschen?')) return;
+    try {
+      await deleteShiftTemplate(id);
+      load();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Fehler beim Loeschen');
+    }
+  };
 
   const load = () => {
     getShiftPlans().then((r) => setPlans(r.data));
@@ -280,6 +336,117 @@ export default function ShiftPlans() {
           ))}
         </div>
         {saving && <div style={{ marginTop: 8, fontSize: 13, color: '#3b82f6' }}>Speichere...</div>}
+        <div style={{ marginTop: 10, borderTop: '1px solid #e2e8f0', paddingTop: 10 }}>
+          <button onClick={() => { setShowTemplateManager(!showTemplateManager); openTemplateEdit(); }}
+            style={{ ...smallBtn, gap: 6 }}>
+            <Settings size={14} /> Schichtvorlagen verwalten
+          </button>
+        </div>
+
+        {showTemplateManager && (
+          <div style={{ marginTop: 12, border: '1px solid #e2e8f0', borderRadius: 8, padding: 16, background: '#fafafa' }}>
+            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}>Schichtvorlagen</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginBottom: 12 }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                  <th style={th}>Kuerzel</th>
+                  <th style={th}>Name</th>
+                  <th style={th}>Beginn</th>
+                  <th style={th}>Ende</th>
+                  <th style={th}>Pause</th>
+                  <th style={th}>Farbe</th>
+                  <th style={th}>Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                {templates.map((t: any) => (
+                  <tr key={t.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={tdd}><span style={{ fontWeight: 700, color: t.color }}>{t.short_code}</span></td>
+                    <td style={tdd}>{t.name}</td>
+                    <td style={tdd}>{t.start_time}</td>
+                    <td style={tdd}>{t.end_time}</td>
+                    <td style={tdd}>{t.break_minutes} min</td>
+                    <td style={tdd}>
+                      <span style={{ display: 'inline-block', width: 20, height: 20, borderRadius: 4, background: t.color, verticalAlign: 'middle' }} />
+                    </td>
+                    <td style={tdd}>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button onClick={() => openTemplateEdit(t)} style={{ ...smallBtn, padding: '3px 8px' }}>
+                          <Pencil size={12} />
+                        </button>
+                        <button onClick={() => removeTemplate(t.id)}
+                          style={{ ...smallBtn, padding: '3px 8px', color: '#ef4444', borderColor: '#fecaca' }}>
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Formular fuer Neue/Bearbeiten */}
+            <div style={{ border: '1px solid #d1d5db', borderRadius: 8, padding: 12, background: '#fff' }}>
+              <div style={{ fontWeight: 500, fontSize: 13, marginBottom: 8 }}>
+                {editingTemplate ? `"${editingTemplate.name}" bearbeiten` : 'Neue Schichtvorlage'}
+              </div>
+              {templateError && <div style={{ color: '#dc2626', fontSize: 12, marginBottom: 8 }}>{templateError}</div>}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                <div>
+                  <label style={labelStyle}>Name *</label>
+                  <input value={templateForm.name}
+                    onChange={(e) => setTemplateForm((f) => ({ ...f, name: e.target.value }))}
+                    style={inputStyle} placeholder="Fruehdienst" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Kuerzel *</label>
+                  <input value={templateForm.short_code} maxLength={5}
+                    onChange={(e) => setTemplateForm((f) => ({ ...f, short_code: e.target.value }))}
+                    style={inputStyle} placeholder="F" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Beginn</label>
+                  <input type="time" value={templateForm.start_time}
+                    onChange={(e) => setTemplateForm((f) => ({ ...f, start_time: e.target.value }))}
+                    style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Ende</label>
+                  <input type="time" value={templateForm.end_time}
+                    onChange={(e) => setTemplateForm((f) => ({ ...f, end_time: e.target.value }))}
+                    style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Pause (min)</label>
+                  <input type="number" value={templateForm.break_minutes}
+                    onChange={(e) => setTemplateForm((f) => ({ ...f, break_minutes: parseInt(e.target.value) || 0 }))}
+                    style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Farbe</label>
+                  <input type="color" value={templateForm.color}
+                    onChange={(e) => setTemplateForm((f) => ({ ...f, color: e.target.value }))}
+                    style={{ ...inputStyle, padding: 2, height: 34 }} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'end' }}>
+                  <label style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <input type="checkbox" checked={templateForm.crosses_midnight}
+                      onChange={(e) => setTemplateForm((f) => ({ ...f, crosses_midnight: e.target.checked }))} />
+                    Ueber Mitternacht
+                  </label>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'end', gap: 6 }}>
+                  <button onClick={saveTemplate} style={primaryBtn}>
+                    {editingTemplate ? 'Speichern' : 'Erstellen'}
+                  </button>
+                  {editingTemplate && (
+                    <button onClick={() => openTemplateEdit()} style={smallBtn}>Abbrechen</button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Dienstplaene */}

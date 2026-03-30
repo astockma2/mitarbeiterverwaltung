@@ -41,6 +41,10 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Die App verwendet Spracherkennung um Nachrichten per Sprache einzugeben.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Die App benoetigt Zugriff auf das Mikrofon fuer die Spracheingabe im Chat.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

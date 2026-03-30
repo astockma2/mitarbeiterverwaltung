@@ -149,10 +149,19 @@ class EmployeeListResponse(BaseModel):
     last_name: str
     email: Optional[str]
     department_id: Optional[int]
+    department_name: Optional[str] = None
     role: UserRole
+    employment_type: EmploymentType
     is_active: bool
 
     model_config = {"from_attributes": True}
+
+    @classmethod
+    def model_validate(cls, obj, **kwargs):
+        data = super().model_validate(obj, **kwargs)
+        if hasattr(obj, 'department') and obj.department:
+            data.department_name = obj.department.name
+        return data
 
 
 # === Qualification ===

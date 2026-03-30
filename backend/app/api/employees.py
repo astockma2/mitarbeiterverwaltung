@@ -27,7 +27,7 @@ router = APIRouter(prefix="/employees", tags=["Mitarbeiter"])
 @router.get("", response_model=PaginatedResponse)
 async def list_employees(
     page: int = Query(1, ge=1),
-    page_size: int = Query(25, ge=1, le=100),
+    page_size: int = Query(25, ge=1, le=500),
     search: Optional[str] = None,
     department_id: Optional[int] = None,
     is_active: Optional[bool] = True,

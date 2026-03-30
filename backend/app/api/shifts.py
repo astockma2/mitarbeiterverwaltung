@@ -165,6 +165,60 @@ async def create_template(
     return _template_to_response(template)
 
 
+@router.put("/templates/{template_id}", response_model=ShiftTemplateResponse)
+async def update_template(
+    template_id: int,
+    request: ShiftTemplateCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: Employee = Depends(get_current_user),
+):
+    """Schichtvorlage aktualisieren. Nur Manager/HR/Admin."""
+    if not is_manager(current_user):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+
+    result = await db.execute(
+        select(ShiftTemplate).where(ShiftTemplate.id == template_id)
+    )
+    template = result.scalar_one_or_none()
+    if template is None:
+        raise HTTPException(status_code=404, detail="Schichtvorlage nicht gefunden")
+
+    h, m = map(int, request.start_time.split(":"))
+    template.start_time = time(h, m)
+    h, m = map(int, request.end_time.split(":"))
+    template.end_time = time(h, m)
+    template.name = request.name
+    template.short_code = request.short_code
+    template.break_minutes = request.break_minutes
+    template.crosses_midnight = request.crosses_midnight
+    template.color = request.color
+    template.department_id = request.department_id
+
+    await log_action(db, current_user.id, "UPDATE", "shift_templates", template_id)
+    return _template_to_response(template)
+
+
+@router.delete("/templates/{template_id}", status_code=204)
+async def delete_template(
+    template_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Employee = Depends(get_current_user),
+):
+    """Schichtvorlage deaktivieren (Soft-Delete). Nur Manager/HR/Admin."""
+    if not is_manager(current_user):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+
+    result = await db.execute(
+        select(ShiftTemplate).where(ShiftTemplate.id == template_id)
+    )
+    template = result.scalar_one_or_none()
+    if template is None:
+        raise HTTPException(status_code=404, detail="Schichtvorlage nicht gefunden")
+
+    template.is_active = False
+    await log_action(db, current_user.id, "DELETE", "shift_templates", template_id)
+
+
 # === Dienstplaene ===
 
 

@@ -99,12 +99,16 @@ class ChatEmployee {
   final int id;
   final String name;
   final String role;
+  final int? departmentId;
+  final String? departmentName;
   final bool online;
 
   ChatEmployee({
     required this.id,
     required this.name,
     required this.role,
+    this.departmentId,
+    this.departmentName,
     required this.online,
   });
 
@@ -113,6 +117,8 @@ class ChatEmployee {
       id: json['id'],
       name: json['name'] ?? '',
       role: json['role'] ?? '',
+      departmentId: json['department_id'],
+      departmentName: json['department_name'],
       online: json['online'] ?? false,
     );
   }

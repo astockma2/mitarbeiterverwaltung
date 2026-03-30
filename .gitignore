@@ -45,5 +45,9 @@ pgdata/
 .DS_Store
 Thumbs.db
 
+# === Tunnel ===
+tunnel.log
+tunnel_url.txt
+
 # === Agents / Skills ===
 .agents/

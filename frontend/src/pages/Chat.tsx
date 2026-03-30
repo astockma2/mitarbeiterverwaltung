@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Send, Plus, MessageCircle, Circle } from 'lucide-react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { Send, Plus, MessageCircle, Circle, Search, ChevronDown, ChevronRight } from 'lucide-react';
 import { getConversations, getMessages, sendMessage, getChatEmployees, createConversation } from '../services/api';
 
 interface Props {
@@ -13,48 +13,89 @@ export default function Chat({ userId }: Props) {
   const [input, setInput] = useState('');
   const [employees, setEmployees] = useState<any[]>([]);
   const [showNewChat, setShowNewChat] = useState(false);
-  const [ws, setWs] = useState<WebSocket | null>(null);
+  const [empSearch, setEmpSearch] = useState('');
+  const [collapsedDepts, setCollapsedDepts] = useState<Set<string>>(new Set());
+  const wsRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [onlineUsers, setOnlineUsers] = useState<number[]>([]);
+  const activeConvRef = useRef<any>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // activeConvRef synchron halten
+  useEffect(() => {
+    activeConvRef.current = activeConv;
+  }, [activeConv]);
 
   // Konversationen laden
-  const loadConversations = () => {
+  const loadConversations = useCallback(() => {
     getConversations().then((r) => setConversations(r.data));
-  };
+  }, []);
 
+  // WebSocket verbinden
   useEffect(() => {
     loadConversations();
 
-    // WebSocket verbinden
     const token = localStorage.getItem('access_token');
     if (token) {
-      const wsUrl = `ws://127.0.0.1:8000/api/v1/chat/ws/${token}`;
-      const socket = new WebSocket(wsUrl);
+      const connect = () => {
+        const wsHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+          ? '127.0.0.1' : window.location.hostname;
+        const wsUrl = `ws://${wsHost}:8000/api/v1/chat/ws/${token}`;
+        const socket = new WebSocket(wsUrl);
 
-      socket.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.type === 'new_message') {
-          setMessages((prev) => {
-            if (prev.length > 0 && prev[0]?.conversation_id === data.conversation_id) {
-              // Duplikat vermeiden
-              if (prev.some((m) => m.id === data.id)) return prev;
-              return [...prev, data];
+        socket.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          if (data.type === 'new_message') {
+            const currentConv = activeConvRef.current;
+            if (currentConv && currentConv.id === data.conversation_id) {
+              setMessages((prev) => {
+                if (prev.some((m) => m.id === data.id)) return prev;
+                return [...prev, data];
+              });
             }
-            return prev;
-          });
-          loadConversations();
-        } else if (data.type === 'online_status') {
-          setOnlineUsers(data.online_users || []);
-        }
+            loadConversations();
+          }
+        };
+
+        socket.onopen = () => console.log('WS verbunden');
+        socket.onclose = (e) => {
+          console.log('WS getrennt', e.code);
+          // Reconnect nach 3 Sekunden
+          if (e.code !== 4001) {
+            setTimeout(connect, 3000);
+          }
+        };
+        socket.onerror = () => socket.close();
+
+        wsRef.current = socket;
       };
 
-      socket.onopen = () => console.log('WS verbunden');
-      socket.onclose = () => console.log('WS getrennt');
+      connect();
 
-      setWs(socket);
-      return () => socket.close();
+      return () => {
+        if (wsRef.current) {
+          wsRef.current.onclose = null; // Kein Reconnect beim Unmount
+          wsRef.current.close();
+        }
+      };
     }
-  }, []);
+  }, [loadConversations]);
+
+  // Polling als Fallback fuer Nachrichten-Aktualisierung
+  useEffect(() => {
+    // Konversationsliste alle 10s aktualisieren
+    pollRef.current = setInterval(() => {
+      loadConversations();
+      // Aktive Konversation Nachrichten neu laden
+      const conv = activeConvRef.current;
+      if (conv) {
+        getMessages(conv.id).then((r) => setMessages(r.data)).catch(() => {});
+      }
+    }, 10000);
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [loadConversations]);
 
   // Nachrichten scrollen
   useEffect(() => {
@@ -69,6 +110,7 @@ export default function Chat({ userId }: Props) {
       const r = await getMessages(conv.id);
       setMessages(r.data);
       // Als gelesen markieren
+      const ws = wsRef.current;
       if (ws?.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ action: 'read', conversation_id: conv.id }));
       }
@@ -84,6 +126,7 @@ export default function Chat({ userId }: Props) {
     const text = input.trim();
     setInput('');
 
+    const ws = wsRef.current;
     if (ws?.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({
         action: 'message',
@@ -107,8 +150,6 @@ export default function Chat({ userId }: Props) {
         member_ids: [employeeId],
       });
       setShowNewChat(false);
-      loadConversations();
-      // Konversation oeffnen
       const convR = await getConversations();
       setConversations(convR.data);
       const conv = convR.data.find((c: any) => c.id === r.data.id);
@@ -120,8 +161,34 @@ export default function Chat({ userId }: Props) {
   useEffect(() => {
     if (showNewChat) {
       getChatEmployees().then((r) => setEmployees(r.data));
+      setEmpSearch('');
+      setCollapsedDepts(new Set());
     }
   }, [showNewChat]);
+
+  // Mitarbeiter filtern und nach Abteilung gruppieren
+  const groupedEmployees = useMemo(() => {
+    let filtered = employees;
+    if (empSearch) {
+      const q = empSearch.toLowerCase();
+      filtered = employees.filter((e) => e.name.toLowerCase().includes(q));
+    }
+    const groups = new Map<string, any[]>();
+    for (const e of filtered) {
+      const dept = e.department_name || 'Ohne Abteilung';
+      if (!groups.has(dept)) groups.set(dept, []);
+      groups.get(dept)!.push(e);
+    }
+    return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [employees, empSearch]);
+
+  const toggleDept = (name: string) => {
+    setCollapsedDepts((prev) => {
+      const next = new Set(prev);
+      next.has(name) ? next.delete(name) : next.add(name);
+      return next;
+    });
+  };
 
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 80px)' }}>
@@ -146,71 +213,113 @@ export default function Chat({ userId }: Props) {
 
         <div style={{ flex: 1, overflow: 'auto' }}>
           {showNewChat ? (
-            // Mitarbeiterliste
             <div>
-              <div style={{ padding: '8px 16px', fontSize: 12, color: '#64748b', fontWeight: 600 }}>
-                Neuen Chat starten
-              </div>
-              {employees.map((e) => (
-                <div key={e.id} onClick={() => startNewChat(e.id)} style={{
-                  padding: '10px 16px', cursor: 'pointer', display: 'flex',
-                  alignItems: 'center', gap: 10, borderBottom: '1px solid #f1f5f9',
-                }}>
-                  <div style={{
-                    width: 36, height: 36, borderRadius: '50%',
-                    background: '#e0e7ff', display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', fontSize: 13, fontWeight: 600, color: '#3730a3',
-                  }}>
-                    {e.name.split(' ').map((n: string) => n[0]).join('')}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 500 }}>{e.name}</div>
-                    <div style={{ fontSize: 11, color: '#94a3b8' }}>{e.role}</div>
-                  </div>
-                  {e.online && (
-                    <Circle size={8} fill="#22c55e" color="#22c55e" />
-                  )}
+              {/* Suchfeld */}
+              <div style={{ padding: '8px 12px' }}>
+                <div style={{ position: 'relative' }}>
+                  <Search size={14} style={{ position: 'absolute', left: 8, top: 8, color: '#94a3b8' }} />
+                  <input
+                    placeholder="Mitarbeiter suchen..."
+                    value={empSearch}
+                    onChange={(e) => setEmpSearch(e.target.value)}
+                    autoFocus
+                    style={{
+                      width: '100%', padding: '6px 6px 6px 28px', borderRadius: 6,
+                      border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box',
+                    }}
+                  />
                 </div>
-              ))}
+              </div>
+
+              {/* Mitarbeiter nach Abteilungen */}
+              {groupedEmployees.map(([deptName, emps]) => {
+                const collapsed = collapsedDepts.has(deptName);
+                return (
+                  <div key={deptName}>
+                    <div
+                      onClick={() => toggleDept(deptName)}
+                      style={{
+                        padding: '6px 12px', fontSize: 12, color: '#475569', fontWeight: 600,
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                        background: '#f8fafc', borderBottom: '1px solid #e2e8f0',
+                      }}
+                    >
+                      {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                      {deptName} ({emps.length})
+                    </div>
+                    {!collapsed && emps.map((e: any) => (
+                      <div key={e.id} onClick={() => startNewChat(e.id)} style={{
+                        padding: '8px 16px', cursor: 'pointer', display: 'flex',
+                        alignItems: 'center', gap: 10, borderBottom: '1px solid #f1f5f9',
+                        transition: 'background 0.15s',
+                      }}
+                      onMouseEnter={(ev) => ev.currentTarget.style.background = '#f8fafc'}
+                      onMouseLeave={(ev) => ev.currentTarget.style.background = ''}>
+                        <div style={{
+                          width: 32, height: 32, borderRadius: '50%',
+                          background: '#e0e7ff', display: 'flex', alignItems: 'center',
+                          justifyContent: 'center', fontSize: 12, fontWeight: 600, color: '#3730a3',
+                          flexShrink: 0,
+                        }}>
+                          {e.name.split(' ').map((n: string) => n[0]).join('')}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 500 }}>{e.name}</div>
+                        </div>
+                        {e.online && (
+                          <Circle size={8} fill="#22c55e" color="#22c55e" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+              {groupedEmployees.length === 0 && empSearch && (
+                <div style={{ padding: 16, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+                  Kein Mitarbeiter gefunden.
+                </div>
+              )}
             </div>
           ) : (
             // Konversationsliste
-            conversations.map((c) => (
-              <div key={c.id}
-                onClick={() => openConversation(c)}
-                style={{
-                  padding: '12px 16px', cursor: 'pointer',
-                  borderBottom: '1px solid #f1f5f9',
-                  background: activeConv?.id === c.id ? '#eff6ff' : 'transparent',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 14, fontWeight: c.unread_count > 0 ? 700 : 500 }}>
-                    {c.name}
-                  </span>
-                  {c.unread_count > 0 && (
-                    <span style={{
-                      background: '#3b82f6', color: '#fff', borderRadius: 10,
-                      padding: '1px 7px', fontSize: 11, fontWeight: 600,
-                    }}>{c.unread_count}</span>
+            <>
+              {conversations.map((c) => (
+                <div key={c.id}
+                  onClick={() => openConversation(c)}
+                  style={{
+                    padding: '12px 16px', cursor: 'pointer',
+                    borderBottom: '1px solid #f1f5f9',
+                    background: activeConv?.id === c.id ? '#eff6ff' : 'transparent',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 14, fontWeight: c.unread_count > 0 ? 700 : 500 }}>
+                      {c.name}
+                    </span>
+                    {c.unread_count > 0 && (
+                      <span style={{
+                        background: '#3b82f6', color: '#fff', borderRadius: 10,
+                        padding: '1px 7px', fontSize: 11, fontWeight: 600,
+                      }}>{c.unread_count}</span>
+                    )}
+                  </div>
+                  {c.last_message && (
+                    <div style={{
+                      fontSize: 12, color: '#94a3b8', marginTop: 2,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {c.last_message.sender_id === userId ? 'Du: ' : ''}
+                      {c.last_message.content}
+                    </div>
                   )}
                 </div>
-                {c.last_message && (
-                  <div style={{
-                    fontSize: 12, color: '#94a3b8', marginTop: 2,
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>
-                    {c.last_message.sender_id === userId ? 'Du: ' : ''}
-                    {c.last_message.content}
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-          {!showNewChat && conversations.length === 0 && (
-            <div style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
-              Keine Konversationen.{'\n'}Starte einen neuen Chat!
-            </div>
+              ))}
+              {conversations.length === 0 && (
+                <div style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+                  Keine Konversationen.{'\n'}Starte einen neuen Chat!
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

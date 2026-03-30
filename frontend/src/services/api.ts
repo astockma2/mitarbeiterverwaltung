@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE = 'http://127.0.0.1:8000/api/v1';
+// Immer relativen Pfad verwenden — Vite-Proxy leitet /api an das Backend weiter
+const API_BASE = '/api/v1';
 
 const api = axios.create({ baseURL: API_BASE });
 
@@ -70,6 +71,9 @@ export const getVacationBalance = (year?: number) =>
 
 // Shifts
 export const getShiftTemplates = () => api.get('/shifts/templates');
+export const createShiftTemplate = (data: any) => api.post('/shifts/templates', data);
+export const updateShiftTemplate = (id: number, data: any) => api.put(`/shifts/templates/${id}`, data);
+export const deleteShiftTemplate = (id: number) => api.delete(`/shifts/templates/${id}`);
 export const getShiftPlans = (params?: Record<string, any>) =>
   api.get('/shifts/plans', { params });
 export const viewShiftPlan = (planId: number) =>

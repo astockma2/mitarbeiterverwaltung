@@ -99,13 +99,6 @@ export default function Login() {
           </button>
         </form>
 
-        <div style={{
-          marginTop: 24, padding: '12px', background: '#f8fafc', borderRadius: 6,
-          fontSize: 12, color: '#64748b',
-        }}>
-          <strong>Dev-Modus:</strong> Passwort ist "dev"<br />
-          Benutzer: admin, hr.leitung, m.mueller, s.schmidt, t.weber
-        </div>
 
         <div style={{ textAlign: 'center', marginTop: 20, fontSize: 11, color: '#94a3b8', letterSpacing: 0.5 }}>
           Powered by <strong>IKK IT</strong>

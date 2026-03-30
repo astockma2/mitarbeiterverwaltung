@@ -1,7 +1,7 @@
-import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../services/api_service.dart';
 import '../services/auth_provider.dart';
 import '../models/chat.dart';
@@ -199,14 +199,41 @@ class _ConversationTile extends StatelessWidget {
   }
 }
 
-class _NewChatSheet extends StatelessWidget {
+class _NewChatSheet extends StatefulWidget {
   final List<ChatEmployee> employees;
   final Function(int) onSelect;
 
   const _NewChatSheet({required this.employees, required this.onSelect});
 
   @override
+  State<_NewChatSheet> createState() => _NewChatSheetState();
+}
+
+class _NewChatSheetState extends State<_NewChatSheet> {
+  String _search = '';
+  final Set<String> _collapsedDepts = {};
+
+  List<ChatEmployee> get _filtered {
+    if (_search.isEmpty) return widget.employees;
+    final q = _search.toLowerCase();
+    return widget.employees.where((e) => e.name.toLowerCase().contains(q)).toList();
+  }
+
+  Map<String, List<ChatEmployee>> get _grouped {
+    final map = <String, List<ChatEmployee>>{};
+    for (final e in _filtered) {
+      final dept = e.departmentName ?? 'Ohne Abteilung';
+      map.putIfAbsent(dept, () => []);
+      map[dept]!.add(e);
+    }
+    return Map.fromEntries(
+      map.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final groups = _grouped;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -217,29 +244,85 @@ class _NewChatSheet extends StatelessWidget {
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
         ),
-        Flexible(
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: employees.length,
-            itemBuilder: (_, i) {
-              final emp = employees[i];
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: Colors.blue.shade50,
-                  child: Text(
-                    emp.name.split(' ').take(2).map((w) => w[0]).join().toUpperCase(),
-                    style: TextStyle(color: Colors.blue.shade700, fontSize: 13),
-                  ),
-                ),
-                title: Text(emp.name),
-                subtitle: Text(emp.role, style: TextStyle(fontSize: 12)),
-                trailing: emp.online
-                    ? Icon(Icons.circle, size: 10, color: Colors.green)
-                    : null,
-                onTap: () => onSelect(emp.id),
-              );
-            },
+        // Suchfeld
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: TextField(
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'Mitarbeiter suchen...',
+              prefixIcon: const Icon(Icons.search, size: 20),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              isDense: true,
+            ),
+            onChanged: (v) => setState(() => _search = v),
           ),
+        ),
+        const SizedBox(height: 8),
+        Flexible(
+          child: groups.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text('Kein Mitarbeiter gefunden.',
+                        style: TextStyle(color: Colors.grey.shade400)),
+                  ),
+                )
+              : ListView(
+                  shrinkWrap: true,
+                  children: groups.entries.expand((entry) {
+                    final dept = entry.key;
+                    final emps = entry.value;
+                    final collapsed = _collapsedDepts.contains(dept);
+                    return [
+                      // Abteilungs-Header
+                      InkWell(
+                        onTap: () => setState(() {
+                          collapsed ? _collapsedDepts.remove(dept) : _collapsedDepts.add(dept);
+                        }),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          color: Colors.grey.shade100,
+                          child: Row(
+                            children: [
+                              Icon(
+                                collapsed ? Icons.chevron_right : Icons.expand_more,
+                                size: 18, color: Colors.grey.shade600,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$dept (${emps.length})',
+                                style: TextStyle(
+                                  fontSize: 12, fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // Mitarbeiter
+                      if (!collapsed)
+                        ...emps.map((emp) => ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: Colors.blue.shade50,
+                                radius: 18,
+                                child: Text(
+                                  emp.name.split(' ').take(2).map((w) => w[0]).join().toUpperCase(),
+                                  style: TextStyle(color: Colors.blue.shade700, fontSize: 12),
+                                ),
+                              ),
+                              title: Text(emp.name, style: const TextStyle(fontSize: 14)),
+                              trailing: emp.online
+                                  ? const Icon(Icons.circle, size: 10, color: Colors.green)
+                                  : null,
+                              dense: true,
+                              onTap: () => widget.onSelect(emp.id),
+                            )),
+                    ];
+                  }).toList(),
+                ),
         ),
       ],
     );
@@ -263,10 +346,75 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final _scrollController = ScrollController();
   bool _loading = true;
 
+  // Spracherkennung
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  bool _speechAvailable = false;
+  bool _isListening = false;
+
+  // Polling
+  Timer? _pollTimer;
+
   @override
   void initState() {
     super.initState();
     _loadMessages();
+    _initSpeech();
+    // Nachrichten alle 5 Sekunden aktualisieren
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _refreshMessages();
+    });
+  }
+
+  Future<void> _refreshMessages() async {
+    try {
+      final fresh = await ApiService.getMessages(widget.conversation.id);
+      if (mounted && fresh.length != _messages.length) {
+        setState(() => _messages = fresh);
+        _scrollToBottom();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _initSpeech() async {
+    _speechAvailable = await _speech.initialize(
+      onError: (error) {
+        setState(() => _isListening = false);
+      },
+    );
+    setState(() {});
+  }
+
+  Future<void> _toggleListening() async {
+    if (!_speechAvailable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Spracherkennung nicht verfuegbar'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (_isListening) {
+      await _speech.stop();
+      setState(() => _isListening = false);
+    } else {
+      setState(() => _isListening = true);
+      await _speech.listen(
+        onResult: (result) {
+          setState(() {
+            _controller.text = result.recognizedWords;
+            _controller.selection = TextSelection.fromPosition(
+              TextPosition(offset: _controller.text.length),
+            );
+          });
+        },
+        localeId: 'de_DE',
+        listenMode: stt.ListenMode.dictation,
+        cancelOnError: true,
+        partialResults: true,
+      );
+    }
   }
 
   Future<void> _loadMessages() async {
@@ -308,6 +456,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
+    _speech.stop();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -424,10 +574,28 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       ),
           ),
 
+          // Spracherkennung aktiv - Anzeige
+          if (_isListening)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              color: Colors.red.shade50,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.graphic_eq, color: Colors.red.shade400, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Spracherkennung aktiv...',
+                    style: TextStyle(color: Colors.red.shade600, fontSize: 12, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ),
+
           // Eingabe
           Container(
             padding: EdgeInsets.only(
-              left: 16,
+              left: 12,
               right: 8,
               top: 8,
               bottom: MediaQuery.of(context).padding.bottom + 8,
@@ -438,11 +606,30 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             ),
             child: Row(
               children: [
+                // Mikrofon-Button
+                GestureDetector(
+                  onTap: _toggleListening,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _isListening ? Colors.red : Colors.grey.shade100,
+                    ),
+                    child: Icon(
+                      _isListening ? Icons.mic : Icons.mic_none,
+                      size: 22,
+                      color: _isListening ? Colors.white : Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: TextField(
                     controller: _controller,
                     decoration: InputDecoration(
-                      hintText: 'Nachricht schreiben...',
+                      hintText: _isListening ? 'Sprechen Sie...' : 'Nachricht schreiben...',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
                         borderSide: BorderSide(color: Colors.grey.shade300),
