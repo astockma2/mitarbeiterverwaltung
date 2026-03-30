@@ -38,7 +38,7 @@ Write-Host ""
 Write-Host "[2/7] Erstelle Installationsverzeichnis..." -ForegroundColor Yellow
 
 if (Test-Path $InstallDir) {
-    $overwrite = Read-Host "  $InstallDir existiert bereits. Ueberschreiben? (j/N)"
+    $overwrite = Read-Host "  $InstallDir existiert bereits. Ueberschreiben? `(j/N`)"
     if ($overwrite -ne "j") { Write-Host "Abgebrochen."; exit 0 }
     Remove-Item -Recurse -Force $InstallDir
 }
@@ -95,17 +95,17 @@ Write-Host ""
 Write-Host "Bitte folgende Angaben machen:" -ForegroundColor Blue
 Write-Host ""
 
-$ServerHost = Read-Host "  Server-Hostname (z.B. mitarbeiter.klinik.local) [localhost]"
+$ServerHost = Read-Host "  Server-Hostname `(z.B. mitarbeiter.klinik.local`) [localhost]"
 if (-not $ServerHost) { $ServerHost = "localhost" }
 
-$adChoice = Read-Host "  Active Directory aktivieren? (j/N)"
+$adChoice = Read-Host "  Active Directory aktivieren? `(j/N`)"
 $AdEnabled = "false"
 $AdServer = ""; $AdBaseDn = ""; $AdBindDn = ""; $AdBindPw = ""
 
 if ($adChoice -eq "j") {
     $AdEnabled = "true"
-    $AdServer = Read-Host "  AD-Server (z.B. ldap://dc01.klinik.local)"
-    $AdBaseDn = Read-Host "  AD-Basis-DN (z.B. DC=klinik,DC=local)"
+    $AdServer = Read-Host "  AD-Server `(z.B. ldap://dc01.klinik.local`)"
+    $AdBaseDn = Read-Host "  AD-Basis-DN `(z.B. DC=klinik,DC=local`)"
     $AdBindDn = Read-Host "  AD-Bind-Benutzer"
     $AdBindPw = Read-Host "  AD-Bind-Passwort" -AsSecureString
     $AdBindPw = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($AdBindPw))
@@ -143,7 +143,7 @@ Write-Host "  OK Konfiguration gespeichert" -ForegroundColor Green
 Write-Host ""
 Write-Host "[5/7] TLS-Zertifikat..." -ForegroundColor Yellow
 
-$createCert = Read-Host "  Self-signed Zertifikat erstellen? (J/n)"
+$createCert = Read-Host "  Self-signed Zertifikat erstellen? `(J/n`)"
 if ($createCert -ne "n") {
     New-Item -ItemType Directory -Path "certs" -Force | Out-Null
 
@@ -153,7 +153,7 @@ if ($createCert -ne "n") {
     } else {
         $cert = New-SelfSignedCertificate -DnsName $ServerHost -CertStoreLocation "Cert:\LocalMachine\My" -NotAfter (Get-Date).AddYears(1)
         Export-PfxCertificate -Cert $cert -FilePath "certs\server.pfx" -Password (ConvertTo-SecureString -String "temp" -Force -AsPlainText) | Out-Null
-        Write-Host "  Hinweis: PFX-Zertifikat erstellt (certs\server.pfx)" -ForegroundColor Yellow
+        Write-Host "  Hinweis: PFX-Zertifikat erstellt `(certs\server.pfx`)" -ForegroundColor Yellow
     }
     Write-Host "  OK Zertifikat erstellt" -ForegroundColor Green
 }
@@ -194,7 +194,7 @@ Write-Host "║                                                         ║" -Fo
 Write-Host "║  Web-App:  https://$ServerHost" -ForegroundColor Green
 Write-Host "║  API-Docs: https://$ServerHost/api/docs" -ForegroundColor Green
 Write-Host "║                                                         ║" -ForegroundColor Green
-Write-Host "║  Standard-Login (Dev-Modus):                            ║" -ForegroundColor Green
+Write-Host "║  Standard-Login `(Dev-Modus`):                            ║" -ForegroundColor Green
 Write-Host "║    Benutzer: admin  |  Passwort: dev                    ║" -ForegroundColor Green
 Write-Host "║                                                         ║" -ForegroundColor Green
 Write-Host "║  Verzeichnis: $InstallDir" -ForegroundColor Green
