@@ -13,6 +13,7 @@ import Reports from './pages/Reports';
 import EmployeeDetail from './pages/EmployeeDetail';
 import MonthlyClosingPage from './pages/MonthlyClosing';
 import Chat from './pages/Chat';
+import Tickets from './pages/Tickets';
 
 export default function App() {
   const { user, loading, logout, isAdmin, isHR, isManager } = useAuth();
@@ -42,6 +43,7 @@ export default function App() {
             <Route path="/schedule" element={<MySchedule />} />
             <Route path="/absences" element={<Absences isManager={isManager} />} />
             <Route path="/chat" element={<Chat userId={user.id} />} />
+            <Route path="/tickets" element={<Tickets isHR={isHR} />} />
             {isHR && <Route path="/employees" element={<Employees />} />}
             <Route path="/employees/:id" element={<EmployeeDetail isHR={isHR} />} />
             {isHR && <Route path="/departments" element={<Departments />} />}

@@ -22,6 +22,7 @@ from app.models.message import (
     ConversationMember,
     Message,
 )
+from app.models.ticket import Ticket, TicketStatus, TicketPriority
 
 __all__ = [
     "Employee",
@@ -42,4 +43,7 @@ __all__ = [
     "Conversation",
     "ConversationMember",
     "Message",
+    "Ticket",
+    "TicketStatus",
+    "TicketPriority",
 ]
