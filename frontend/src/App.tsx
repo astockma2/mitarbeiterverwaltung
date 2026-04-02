@@ -13,6 +13,7 @@ import Reports from './pages/Reports';
 import EmployeeDetail from './pages/EmployeeDetail';
 import MonthlyClosingPage from './pages/MonthlyClosing';
 import Chat from './pages/Chat';
+import Produkt from './pages/Produkt';
 
 export default function App() {
   const { user, loading, logout, isAdmin, isHR, isManager } = useAuth();
@@ -31,6 +32,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/produkt" element={<Produkt />} />
         <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
 
         {!user ? (
