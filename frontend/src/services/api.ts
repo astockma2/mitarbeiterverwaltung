@@ -120,4 +120,14 @@ export const sendMessage = (conversationId: number, content: string) =>
   api.post(`/chat/conversations/${conversationId}/messages`, { content });
 export const getChatEmployees = () => api.get('/chat/employees');
 
+// Tickets
+export const getTickets = (params?: Record<string, any>) =>
+  api.get('/tickets', { params });
+export const createTicket = (data: { title: string; description: string; priority: string }) =>
+  api.post('/tickets', data);
+export const getTicket = (id: number) => api.get(`/tickets/${id}`);
+export const updateTicket = (id: number, data: Record<string, any>) =>
+  api.patch(`/tickets/${id}`, data);
+export const closeTicket = (id: number) => api.delete(`/tickets/${id}`);
+
 export default api;

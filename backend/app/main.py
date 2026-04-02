@@ -17,6 +17,7 @@ from app.api.monthly_closing import router as monthly_router
 from app.api.shifts import router as shifts_router
 from app.api.chat import router as chat_router
 from app.api.reports import router as reports_router
+from app.api.tickets import router as tickets_router
 from app.config import get_settings
 from app.database import create_tables
 from app.services.seed import seed_demo_data
@@ -69,6 +70,7 @@ app.include_router(monthly_router, prefix=API_PREFIX)
 app.include_router(shifts_router, prefix=API_PREFIX)
 app.include_router(chat_router, prefix=API_PREFIX)
 app.include_router(reports_router, prefix=API_PREFIX)
+app.include_router(tickets_router, prefix=API_PREFIX)
 
 
 @app.exception_handler(Exception)

@@ -1,7 +1,7 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import {
   Users, Clock, Calendar, BarChart3, Building2, LogOut,
-  ClipboardList, CalendarDays, Home, MessageCircle, Lock, FileSpreadsheet
+  ClipboardList, CalendarDays, Home, MessageCircle, Lock, FileSpreadsheet, TicketCheck
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { path: '/schedule', label: 'Mein Dienstplan', icon: CalendarDays, roles: ['all'] },
   { path: '/absences', label: 'Abwesenheiten', icon: ClipboardList, roles: ['all'] },
   { path: '/chat', label: 'Nachrichten', icon: MessageCircle, roles: ['all'] },
+  { path: '/tickets', label: 'Tickets', icon: TicketCheck, roles: ['all'] },
   { path: '/employees', label: 'Mitarbeiter', icon: Users, roles: ['HR', 'ADMIN'] },
   { path: '/departments', label: 'Abteilungen', icon: Building2, roles: ['HR', 'ADMIN'] },
   { path: '/shift-plans', label: 'Dienstplanung', icon: Calendar, roles: ['manager'] },
