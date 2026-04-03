@@ -57,13 +57,15 @@ class TimeClockScreenState extends State<TimeClockScreen> {
       _status = results[0] as ClockStatus;
       _today = results[1] as DailySummary;
       _entries = results[2] as List<TimeEntry>;
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     } on ApiException catch (e) {
       if (e.statusCode == 401) {
         _handleUnauthorized();
         return;
       }
-      setState(() { _loading = false; _loadFailed = true; });
+      if (mounted) setState(() { _loading = false; _loadFailed = true; });
+    } catch (_) {
+      if (mounted) setState(() { _loading = false; _loadFailed = true; });
     }
   }
 
@@ -78,8 +80,11 @@ class TimeClockScreenState extends State<TimeClockScreen> {
       } else {
         _showError(e.message);
       }
+    } catch (_) {
+      _showError('Netzwerkfehler: Server nicht erreichbar');
+    } finally {
+      if (mounted) setState(() => _acting = false);
     }
-    setState(() => _acting = false);
   }
 
   Future<void> _clockOut() async {
@@ -102,8 +107,11 @@ class TimeClockScreenState extends State<TimeClockScreen> {
       } else {
         _showError(e.message);
       }
+    } catch (_) {
+      _showError('Netzwerkfehler: Server nicht erreichbar');
+    } finally {
+      if (mounted) setState(() => _acting = false);
     }
-    setState(() => _acting = false);
   }
 
   void _showError(String msg) {
