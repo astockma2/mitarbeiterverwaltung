@@ -21,6 +21,7 @@ from app.api.tickets import router as tickets_router
 from app.config import get_settings
 from app.database import create_tables
 from app.services.seed import seed_demo_data
+from app.services.seed_prod import seed_bot_user
 
 settings = get_settings()
 
@@ -35,6 +36,7 @@ async def lifespan(app: FastAPI):
     # Startup: Tabellen erstellen und Demo-Daten laden
     await create_tables()
     await seed_demo_data()
+    await seed_bot_user()
     logging.getLogger(__name__).info("Anwendung gestartet")
     yield
     logging.getLogger(__name__).info("Anwendung beendet")

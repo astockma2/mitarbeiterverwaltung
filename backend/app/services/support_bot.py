@@ -16,7 +16,9 @@ Hier ist das Benutzerhandbuch:
 {handbuch_inhalt}
 """
 
-HANDBUCH_PFAD = "docs/benutzerhandbuch.md"
+from pathlib import Path
+
+HANDBUCH_PFAD = Path(__file__).resolve().parent.parent.parent / "docs" / "benutzerhandbuch.md"
 
 HANDBUCH_FALLBACK = """# MVA Benutzerhandbuch (Platzhalter)
 
@@ -33,7 +35,7 @@ Bei weiteren Fragen wenden Sie sich bitte an die IT-Abteilung.
 
 def _lade_handbuch() -> str:
     try:
-        with open(HANDBUCH_PFAD, encoding="utf-8") as f:
+        with open(str(HANDBUCH_PFAD), encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
         log.warning("Benutzerhandbuch nicht gefunden: %s – verwende Platzhalter", HANDBUCH_PFAD)

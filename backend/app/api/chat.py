@@ -19,6 +19,9 @@ from app.models.message import Conversation, ConversationMember, Message
 router = APIRouter(prefix="/chat", tags=["Chat"])
 log = logging.getLogger(__name__)
 
+# Referenz auf laufende Bot-Tasks (verhindert Garbage Collection)
+_bot_tasks: set[asyncio.Task] = set()
+
 
 # ── WebSocket Connection Manager ──────────────────────────────────
 
@@ -129,9 +132,11 @@ async def websocket_endpoint(websocket: WebSocket):
                             await manager.send_to_conversation(members, msg)
                             bot_id = await _find_bot_in_direct_conv(db, conv_id)
                             if bot_id:
-                                asyncio.create_task(
+                                task = asyncio.create_task(
                                     _handle_bot_response(conv_id, content, bot_id, members)
                                 )
+                                _bot_tasks.add(task)
+                                task.add_done_callback(_bot_tasks.discard)
 
             elif action == "typing":
                 conv_id = data.get("conversation_id")
@@ -223,7 +228,7 @@ async def _handle_bot_response(
             history_msgs = list(reversed(history_q.scalars().all()))
             history = [
                 {"content": m.content, "is_bot": m.sender_id == bot_id}
-                for m in history_msgs
+                for m in history_msgs[:-1]
             ]
 
             response_text = await get_bot_response(user_message, history)
