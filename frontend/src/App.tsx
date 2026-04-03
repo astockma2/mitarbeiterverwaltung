@@ -14,6 +14,8 @@ import EmployeeDetail from './pages/EmployeeDetail';
 import MonthlyClosingPage from './pages/MonthlyClosing';
 import Chat from './pages/Chat';
 import Tickets from './pages/Tickets';
+import Produkt from './pages/Produkt';
+import Handbuch from './pages/Handbuch';
 
 export default function App() {
   const { user, loading, logout, isAdmin, isHR, isManager } = useAuth();
@@ -32,6 +34,8 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/produkt" element={<Produkt />} />
+        <Route path="/produkt/handbuch" element={<Handbuch />} />
         <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
 
         {!user ? (
