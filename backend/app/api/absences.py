@@ -243,8 +243,12 @@ async def get_vacation_balance(
     if year is None:
         year = date.today().year
 
-    # Standard-Urlaubsanspruch (konfigurierbar, hier 30 Tage)
-    annual_entitlement = 30.0
+    # Individuellen Urlaubsanspruch des Mitarbeiters laden
+    emp_result = await db.execute(
+        select(Employee).where(Employee.id == target_id)
+    )
+    emp = emp_result.scalar_one_or_none()
+    annual_entitlement = float(emp.vacation_days_per_year) if emp else 30.0
 
     # Genommene / genehmigte Urlaubstage
     result = await db.execute(
