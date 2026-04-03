@@ -74,9 +74,27 @@ async def get_bot_response(user_message: str, conversation_history: list[dict]) 
 
         return response.content[0].text
 
-    except Exception as e:
-        log.error("Fehler bei Bot-Antwort: %s", e)
+    except anthropic.AuthenticationError as e:
+        log.error("Anthropic Auth-Fehler (API Key ungültig?): %s", e)
         return (
-            "Es ist ein Fehler aufgetreten. Bitte versuchen Sie es spaeter erneut "
+            "Der KI-Support ist momentan nicht verfügbar. "
+            "Bitte wenden Sie sich an die IT-Abteilung."
+        )
+    except anthropic.RateLimitError as e:
+        log.warning("Anthropic Rate-Limit erreicht: %s", e)
+        return (
+            "Der KI-Support ist momentan überlastet. "
+            "Bitte versuchen Sie es in einigen Minuten erneut."
+        )
+    except anthropic.APIError as e:
+        log.error("Anthropic API-Fehler (status=%s): %s", e.status_code, e)
+        return (
+            "Es ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut "
+            "oder wenden Sie sich an die IT-Abteilung."
+        )
+    except Exception as e:
+        log.error("Unbekannter Fehler bei Bot-Antwort: %s", e, exc_info=True)
+        return (
+            "Es ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut "
             "oder wenden Sie sich an die IT-Abteilung."
         )

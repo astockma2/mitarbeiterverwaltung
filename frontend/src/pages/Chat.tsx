@@ -66,67 +66,76 @@ export default function Chat({ userId }: Props) {
     setConversations(convs);
   }, [botEmployeeId]);
 
-  // WebSocket verbinden
+  // Ref auf loadConversations, damit WS/Polling immer die aktuelle Version nutzen,
+  // ohne dass sich die Effekte bei jeder botEmployeeId-Änderung neu registrieren.
+  const loadConversationsRef = useRef(loadConversations);
+  useEffect(() => { loadConversationsRef.current = loadConversations; }, [loadConversations]);
+
+  // Konversationen beim Mount und bei botEmployeeId-Änderung laden
   useEffect(() => {
     loadConversations().catch(() => {});
+  }, [loadConversations]);
 
+  // WebSocket einmalig beim Mount aufbauen (keine Abhängigkeit von loadConversations,
+  // da sonst bei botEmployeeId-Laden eine Race Condition entsteht: WS schließen + neu öffnen)
+  useEffect(() => {
     const token = localStorage.getItem('access_token');
-    if (token) {
-      const connect = () => {
-        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsHost = isLocal ? '127.0.0.1:8000' : window.location.host;
-        const wsUrl = `${wsProtocol}//${wsHost}/api/v1/chat/ws`;
-        const socket = new WebSocket(wsUrl);
+    if (!token) return;
 
-        // Token als erste Nachricht nach dem Handshake senden (nicht in der URL)
-        socket.onopen = () => {
-          socket.send(JSON.stringify({ action: 'auth', token }));
-          console.log('WS verbunden');
-        };
+    const connect = () => {
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsHost = isLocal ? '127.0.0.1:8000' : window.location.host;
+      const wsUrl = `${wsProtocol}//${wsHost}/api/v1/chat/ws`;
+      const socket = new WebSocket(wsUrl);
 
-        socket.onmessage = (event) => {
-          const data = JSON.parse(event.data);
-          if (data.type === 'new_message') {
-            const currentConv = activeConvRef.current;
-            if (currentConv && currentConv.id === data.conversation_id) {
-              setMessages((prev) => {
-                if (prev.some((m) => m.id === data.id)) return prev;
-                return [...prev, data];
-              });
-            }
-            loadConversations().catch(() => {});
-          }
-        };
-
-        socket.onclose = (e) => {
-          console.log('WS getrennt', e.code);
-          // Reconnect nach 3 Sekunden
-          if (e.code !== 4001) {
-            setTimeout(connect, 3000);
-          }
-        };
-        socket.onerror = () => socket.close();
-
-        wsRef.current = socket;
+      // Token als erste Nachricht nach dem Handshake senden (nicht in der URL)
+      socket.onopen = () => {
+        socket.send(JSON.stringify({ action: 'auth', token }));
+        console.log('WS verbunden');
       };
 
-      connect();
-
-      return () => {
-        if (wsRef.current) {
-          wsRef.current.onclose = null; // Kein Reconnect beim Unmount
-          wsRef.current.close();
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'new_message') {
+          const currentConv = activeConvRef.current;
+          if (currentConv && currentConv.id === data.conversation_id) {
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === data.id)) return prev;
+              return [...prev, data];
+            });
+          }
+          loadConversationsRef.current?.().catch(() => {});
         }
       };
-    }
-  }, [loadConversations]);
+
+      socket.onclose = (e) => {
+        console.log('WS getrennt', e.code);
+        // Reconnect nach 3 Sekunden
+        if (e.code !== 4001) {
+          setTimeout(connect, 3000);
+        }
+      };
+      socket.onerror = () => socket.close();
+
+      wsRef.current = socket;
+    };
+
+    connect();
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.onclose = null; // Kein Reconnect beim Unmount
+        wsRef.current.close();
+      }
+    };
+  }, []); // Leeres Array: WS wird nur einmal beim Mount aufgebaut
 
   // Polling als Fallback fuer Nachrichten-Aktualisierung
   useEffect(() => {
     // Konversationsliste alle 10s aktualisieren
     pollRef.current = setInterval(() => {
-      loadConversations().catch(() => {});
+      loadConversationsRef.current?.().catch(() => {});
       // Aktive Konversation Nachrichten neu laden
       const conv = activeConvRef.current;
       if (conv) {
@@ -137,7 +146,7 @@ export default function Chat({ userId }: Props) {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [loadConversations]);
+  }, []); // Leeres Array: Polling-Interval einmalig starten
 
   // Nachrichten scrollen
   useEffect(() => {

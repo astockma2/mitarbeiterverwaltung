@@ -428,7 +428,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   Future<void> _refreshMessages() async {
     try {
       final fresh = await ApiService.getMessages(widget.conversation.id);
-      if (mounted && fresh.length != _messages.length) {
+      if (!mounted) return;
+      // ID-Vergleich statt Längenvergleich: erkennt auch Updates bei gleicher Anzahl
+      final lastFreshId = fresh.isNotEmpty ? fresh.last.id : null;
+      final lastCurrentId = _messages.isNotEmpty ? _messages.last.id : null;
+      if (lastFreshId != lastCurrentId) {
         setState(() => _messages = fresh);
         _scrollToBottom();
       }
