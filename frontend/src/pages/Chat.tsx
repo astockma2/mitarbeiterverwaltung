@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { Send, Plus, MessageCircle, Circle, Search, ChevronDown, ChevronRight, Bot, Users, UserPlus, UserMinus, Pencil, X, Check, Paperclip, Download, Image } from 'lucide-react';
+import { Send, Plus, MessageCircle, Circle, Search, ChevronDown, ChevronRight, Bot, Users, UserPlus, UserMinus, Pencil, X, Check, Paperclip, Download } from 'lucide-react';
 import { getConversations, getMessages, sendMessage, getChatEmployees, createConversation, getSupportBotId, updateConversation, updateMembers, uploadChatFile, getChatFileUrl } from '../services/api';
 
 interface Props {
