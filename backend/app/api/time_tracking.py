@@ -5,7 +5,7 @@ from datetime import datetime, date, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -91,6 +91,18 @@ class TimeEntryResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @field_serializer("clock_in", "created_at")
+    def _serialize_utc_dt(self, dt: datetime) -> str:
+        """Naive UTC-Datetimes als ISO-String mit 'Z'-Suffix serialisieren."""
+        return dt.isoformat() + "Z"
+
+    @field_serializer("clock_out")
+    def _serialize_utc_dt_optional(self, dt: Optional[datetime]) -> Optional[str]:
+        """Optionale naive UTC-Datetimes als ISO-String mit 'Z'-Suffix serialisieren."""
+        if dt is None:
+            return None
+        return dt.isoformat() + "Z"
 
 
 class DailySummary(BaseModel):
@@ -218,7 +230,7 @@ async def get_clock_status(
         elapsed = (_utcnow() - open_entry.clock_in).total_seconds()
         return {
             "clocked_in": True,
-            "since": open_entry.clock_in.isoformat(),
+            "since": open_entry.clock_in.isoformat() + "Z",
             "elapsed_hours": round(elapsed / 3600, 2),
             "entry_id": open_entry.id,
         }
