@@ -237,6 +237,29 @@ class ApiService {
   static String get wsUrl {
     return baseUrl.replaceFirst('http', 'ws').replaceFirst('/api/v1', '');
   }
+
+  /// Prueft ob eine neuere App-Version verfuegbar ist.
+  /// Gibt {version, download_url, force_update} zurueck oder null bei Fehler.
+  static Future<Map<String, dynamic>?> checkAppVersion() async {
+    try {
+      final data = await _getPublic('/app/version');
+      return data as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// GET ohne Auth-Token (fuer oeffentliche Endpoints)
+  static Future<dynamic> _getPublic(String path) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl$path'),
+      headers: {'Content-Type': 'application/json'},
+    ).timeout(const Duration(seconds: 5));
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    }
+    throw ApiException('Fehler', response.statusCode);
+  }
 }
 
 class ApiException implements Exception {
