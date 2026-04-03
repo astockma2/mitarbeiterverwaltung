@@ -111,7 +111,7 @@ export const exportExtendedCsv = (year: number, month: number) =>
   });
 
 // Chat
-export const getSupportBotId = () => api.get('/chat/support-bot-id');
+export const getBots = () => api.get('/chat/bots');
 export const getConversations = () => api.get('/chat/conversations');
 export const createConversation = (data: { type: string; name?: string; member_ids: number[] }) =>
   api.post('/chat/conversations', data);

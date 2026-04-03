@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { Send, Plus, MessageCircle, Circle, Search, ChevronDown, ChevronRight, Bot } from 'lucide-react';
-import { getConversations, getMessages, sendMessage, getChatEmployees, createConversation, getSupportBotId } from '../services/api';
+import { Send, Plus, MessageCircle, Circle, Search, ChevronDown, ChevronRight, Bot, FileText } from 'lucide-react';
+import { getConversations, getMessages, sendMessage, getChatEmployees, createConversation, getBots } from '../services/api';
 
 interface Props {
   userId: number;
@@ -15,7 +15,7 @@ export default function Chat({ userId }: Props) {
   const [showNewChat, setShowNewChat] = useState(false);
   const [empSearch, setEmpSearch] = useState('');
   const [collapsedDepts, setCollapsedDepts] = useState<Set<string>>(new Set());
-  const [botEmployeeId, setBotEmployeeId] = useState<number | null>(null);
+  const [bots, setBots] = useState<{ id: number; personnel_number: string; name: string }[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeConvRef = useRef<any>(null);
@@ -26,45 +26,48 @@ export default function Chat({ userId }: Props) {
     activeConvRef.current = activeConv;
   }, [activeConv]);
 
-  // Bot-ID einmalig laden und Bot-Konversation sicherstellen
+  // Bot-IDs einmalig laden
   useEffect(() => {
-    getSupportBotId()
-      .then((r) => setBotEmployeeId(r.data.id))
+    getBots()
+      .then((r) => setBots(r.data))
       .catch(() => {});
   }, []);
 
-  // Konversationen laden, Bot-Konversation immer an Position 1
+  // Konversationen laden, Bot-Konversationen immer oben anpinnen
   const loadConversations = useCallback(async () => {
     const r = await getConversations();
     const convs: any[] = r.data;
 
-    if (botEmployeeId) {
-      const hasBot = convs.some((c) =>
-        c.type === 'DIRECT' &&
-        c.members?.some((m: any) => m.id === botEmployeeId)
+    // Für jeden Bot sicherstellen dass eine Konversation existiert
+    for (const bot of bots) {
+      const hasBotConv = convs.some((c) =>
+        c.type === 'DIRECT' && c.members?.some((m: any) => m.id === bot.id)
       );
-      if (!hasBot) {
+      if (!hasBotConv) {
         try {
-          await createConversation({ type: 'DIRECT', member_ids: [botEmployeeId] });
+          await createConversation({ type: 'DIRECT', member_ids: [bot.id] });
           const r2 = await getConversations();
           convs.splice(0, convs.length, ...r2.data);
         } catch {}
       }
     }
 
-    // Bot-Konversation an Position 1 sortieren
+    const botIds = bots.map((b) => b.id);
+
+    // Bot-Konversationen oben sortieren (BOT001 vor BOT002), danach nach Zeit
     convs.sort((a, b) => {
-      const aIsBot = botEmployeeId != null && a.members?.some((m: any) => m.id === botEmployeeId);
-      const bIsBot = botEmployeeId != null && b.members?.some((m: any) => m.id === botEmployeeId);
-      if (aIsBot && !bIsBot) return -1;
-      if (!aIsBot && bIsBot) return 1;
+      const aBot = bots.find((bot) => a.type === 'DIRECT' && a.members?.some((m: any) => m.id === bot.id));
+      const bBot = bots.find((bot) => b.type === 'DIRECT' && b.members?.some((m: any) => m.id === bot.id));
+      if (aBot && !bBot) return -1;
+      if (!aBot && bBot) return 1;
+      if (aBot && bBot) return aBot.personnel_number.localeCompare(bBot.personnel_number);
       const aTime = a.last_message?.created_at ?? '';
       const bTime = b.last_message?.created_at ?? '';
       return bTime.localeCompare(aTime);
     });
 
     setConversations(convs);
-  }, [botEmployeeId]);
+  }, [bots]);
 
   // WebSocket verbinden
   useEffect(() => {
@@ -327,19 +330,24 @@ export default function Chat({ userId }: Props) {
             // Konversationsliste
             <>
               {conversations.map((c) => {
-                const isBot = botEmployeeId != null && c.members?.some((m: any) => m.id === botEmployeeId);
+                const supportBot = bots.find((b) => b.personnel_number === 'BOT001');
+                const docsBot = bots.find((b) => b.personnel_number === 'BOT002');
+                const isSupportBot = supportBot != null && c.type === 'DIRECT' && c.members?.some((m: any) => m.id === supportBot.id);
+                const isDocsBot = docsBot != null && c.type === 'DIRECT' && c.members?.some((m: any) => m.id === docsBot.id);
+                const bgColor = activeConv?.id === c.id ? '#eff6ff' : isSupportBot ? '#f0fdf4' : isDocsBot ? '#eff6ff' : 'transparent';
                 return (
                 <div key={c.id}
                   onClick={() => openConversation(c)}
                   style={{
                     padding: '12px 16px', cursor: 'pointer',
                     borderBottom: '1px solid #f1f5f9',
-                    background: activeConv?.id === c.id ? '#eff6ff' : isBot ? '#f0fdf4' : 'transparent',
+                    background: bgColor,
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: 14, fontWeight: c.unread_count > 0 ? 700 : 500, display: 'flex', alignItems: 'center', gap: 5 }}>
-                      {isBot && <Bot size={13} color="#16a34a" />}
+                      {isSupportBot && <Bot size={13} color="#16a34a" />}
+                      {isDocsBot && <FileText size={13} color="#2563eb" />}
                       {c.name}
                     </span>
                     {c.unread_count > 0 && (

@@ -225,12 +225,12 @@ class ApiService {
     return (data as List).map((e) => ChatEmployee.fromJson(e)).toList();
   }
 
-  static Future<int?> getSupportBotId() async {
+  static Future<List<Map<String, dynamic>>> getBots() async {
     try {
-      final data = await _get('/chat/support-bot-id');
-      return data['id'] as int?;
+      final data = await _get('/chat/bots');
+      return (data as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } catch (_) {
-      return null;
+      return [];
     }
   }
 

@@ -17,51 +17,75 @@ class ChatListScreen extends StatefulWidget {
 class _ChatListScreenState extends State<ChatListScreen> {
   List<ChatConversation> _conversations = [];
   bool _loading = true;
-  int? _botEmployeeId;
+  int? _supportBotId;
+  int? _docsBotId;
 
   @override
   void initState() {
     super.initState();
-    _initBotAndLoad();
+    _initBotsAndLoad();
   }
 
-  Future<void> _initBotAndLoad() async {
-    _botEmployeeId = await ApiService.getSupportBotId();
+  Future<void> _initBotsAndLoad() async {
+    final bots = await ApiService.getBots();
+    for (final bot in bots) {
+      if (bot['personnel_number'] == 'BOT001') {
+        _supportBotId = bot['id'] as int?;
+      } else if (bot['personnel_number'] == 'BOT002') {
+        _docsBotId = bot['id'] as int?;
+      }
+    }
     await _load();
   }
+
+  bool _isSupportBot(ChatConversation conv) =>
+      _supportBotId != null &&
+      conv.type == 'DIRECT' &&
+      conv.members.any((m) => m.id == _supportBotId);
+
+  bool _isDocsBot(ChatConversation conv) =>
+      _docsBotId != null &&
+      conv.type == 'DIRECT' &&
+      conv.members.any((m) => m.id == _docsBotId);
 
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
       List<ChatConversation> convs = await ApiService.getConversations();
 
-      // Bot-Konversation automatisch anlegen falls nicht vorhanden
-      if (_botEmployeeId != null) {
-        final hasBot = convs.any((c) =>
-          c.type == 'DIRECT' &&
-          c.members.any((m) => m.id == _botEmployeeId)
+      // Für jeden Bot automatisch Konversation anlegen falls nicht vorhanden
+      for (final entry in [
+        (_supportBotId, 'BOT001'),
+        (_docsBotId, 'BOT002'),
+      ]) {
+        final botId = entry.$1;
+        if (botId == null) continue;
+        final hasConv = convs.any((c) =>
+          c.type == 'DIRECT' && c.members.any((m) => m.id == botId)
         );
-        if (!hasBot) {
+        if (!hasConv) {
           try {
-            await ApiService.createConversation(
-              type: 'DIRECT',
-              memberIds: [_botEmployeeId!],
-            );
+            await ApiService.createConversation(type: 'DIRECT', memberIds: [botId]);
             convs = await ApiService.getConversations();
           } catch (_) {}
         }
       }
 
-      // Bot-Konversation immer an erste Stelle sortieren
+      // Bot-Konversationen immer oben sortieren (BOT001 vor BOT002)
       convs.sort((a, b) {
-        final aIsBot = _botEmployeeId != null &&
-            a.type == 'DIRECT' &&
-            a.members.any((m) => m.id == _botEmployeeId);
-        final bIsBot = _botEmployeeId != null &&
-            b.type == 'DIRECT' &&
-            b.members.any((m) => m.id == _botEmployeeId);
+        final aIsSupport = _isSupportBot(a);
+        final aIsDocs = _isDocsBot(a);
+        final bIsSupport = _isSupportBot(b);
+        final bIsDocs = _isDocsBot(b);
+        final aIsBot = aIsSupport || aIsDocs;
+        final bIsBot = bIsSupport || bIsDocs;
         if (aIsBot && !bIsBot) return -1;
         if (!aIsBot && bIsBot) return 1;
+        if (aIsBot && bIsBot) {
+          // BOT001 vor BOT002
+          if (aIsSupport && !bIsSupport) return -1;
+          if (!aIsSupport && bIsSupport) return 1;
+        }
         final aTime = a.lastMessage?.createdAt ?? '';
         final bTime = b.lastMessage?.createdAt ?? '';
         return bTime.compareTo(aTime);
@@ -143,12 +167,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           Divider(height: 1, indent: 72),
                       itemBuilder: (_, i) {
                         final conv = _conversations[i];
-                        final isBot = _botEmployeeId != null &&
-                            conv.type == 'DIRECT' &&
-                            conv.members.any((m) => m.id == _botEmployeeId);
                         return _ConversationTile(
                           conversation: conv,
-                          isBot: isBot,
+                          isSupportBot: _isSupportBot(conv),
+                          isDocsBot: _isDocsBot(conv),
                           onTap: () => _openConversation(conv),
                         );
                       },
@@ -160,17 +182,20 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
 class _ConversationTile extends StatelessWidget {
   final ChatConversation conversation;
-  final bool isBot;
+  final bool isSupportBot;
+  final bool isDocsBot;
   final VoidCallback onTap;
 
   const _ConversationTile({
     required this.conversation,
-    required this.isBot,
+    required this.isSupportBot,
+    required this.isDocsBot,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isAnyBot = isSupportBot || isDocsBot;
     final initials = conversation.name
         .split(' ')
         .take(2)
@@ -178,13 +203,30 @@ class _ConversationTile extends StatelessWidget {
         .join()
         .toUpperCase();
 
+    final tileColor = isSupportBot
+        ? Colors.green.shade50
+        : isDocsBot
+            ? Colors.blue.shade50
+            : null;
+    final avatarBgColor = isSupportBot
+        ? Colors.green.shade100
+        : isDocsBot
+            ? Colors.blue.shade100
+            : Colors.blue.shade100;
+    final iconColor = isSupportBot
+        ? Colors.green.shade700
+        : Colors.blue.shade700;
+    final dotColor = isSupportBot
+        ? Colors.green.shade500
+        : Colors.blue.shade500;
+
     return ListTile(
       onTap: onTap,
-      tileColor: isBot ? Colors.green.shade50 : null,
+      tileColor: tileColor,
       leading: CircleAvatar(
-        backgroundColor: isBot ? Colors.green.shade100 : Colors.blue.shade100,
-        child: isBot
-            ? Icon(Icons.smart_toy, size: 20, color: Colors.green.shade700)
+        backgroundColor: avatarBgColor,
+        child: isAnyBot
+            ? Icon(Icons.smart_toy, size: 20, color: iconColor)
             : Text(
                 initials,
                 style: TextStyle(
@@ -196,8 +238,8 @@ class _ConversationTile extends StatelessWidget {
       ),
       title: Row(
         children: [
-          if (isBot) ...[
-            Icon(Icons.circle, size: 8, color: Colors.green.shade500),
+          if (isAnyBot) ...[
+            Icon(Icons.circle, size: 8, color: dotColor),
             const SizedBox(width: 6),
           ],
           Text(

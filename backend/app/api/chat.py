@@ -176,22 +176,11 @@ async def _broadcast_online_status():
 
 # ── Bot-Hilfsfunktionen ──────────────────────────────────────────
 
-BOT_PERSONNEL_NUMBER = "BOT001"
-
-
-async def _get_bot_employee_id(db: AsyncSession) -> int | None:
-    """Gibt die Datenbank-ID des Support-Bots zurück."""
-    result = await db.execute(
-        select(Employee.id).where(
-            Employee.personnel_number == BOT_PERSONNEL_NUMBER,
-            Employee.is_active == True,
-        )
-    )
-    return result.scalar_one_or_none()
+BOT_PERSONNEL_NUMBERS = ["BOT001", "BOT002"]
 
 
 async def _find_bot_in_direct_conv(db: AsyncSession, conversation_id: int) -> int | None:
-    """Gibt die Bot-ID zurück wenn die Konversation eine DIRECT-Unterhaltung mit dem Bot ist."""
+    """Gibt die Bot-ID zurück wenn die Konversation eine DIRECT-Unterhaltung mit einem Bot ist."""
     conv_q = await db.execute(
         select(Conversation.type).where(Conversation.id == conversation_id)
     )
@@ -204,7 +193,7 @@ async def _find_bot_in_direct_conv(db: AsyncSession, conversation_id: int) -> in
         .join(ConversationMember, Employee.id == ConversationMember.employee_id)
         .where(
             ConversationMember.conversation_id == conversation_id,
-            Employee.personnel_number == BOT_PERSONNEL_NUMBER,
+            Employee.personnel_number.in_(BOT_PERSONNEL_NUMBERS),
         )
     )
     return bot_q.scalar_one_or_none()
@@ -214,10 +203,19 @@ async def _handle_bot_response(
     conv_id: int, user_message: str, bot_id: int, member_ids: list[int]
 ):
     """Generiert die Bot-Antwort und speichert/sendet sie asynchron."""
-    from app.services.support_bot import get_bot_response
+    from app.services.support_bot import get_bot_response, get_docs_bot_response
 
     try:
         async with async_session() as db:
+            # Bot-Personalnummer und Anzeigename ermitteln
+            bot_info_q = await db.execute(
+                select(Employee.personnel_number, Employee.first_name, Employee.last_name)
+                .where(Employee.id == bot_id)
+            )
+            bot_row = bot_info_q.one_or_none()
+            bot_personnel_number = bot_row[0] if bot_row else "BOT001"
+            bot_display_name = f"{bot_row[1]} {bot_row[2]}" if bot_row else "MVA Support"
+
             # Letzte 10 Nachrichten als Kontext laden
             history_q = await db.execute(
                 select(Message)
@@ -231,7 +229,10 @@ async def _handle_bot_response(
                 for m in history_msgs[:-1]
             ]
 
-            response_text = await get_bot_response(user_message, history)
+            if bot_personnel_number == "BOT002":
+                response_text = await get_docs_bot_response(user_message, history)
+            else:
+                response_text = await get_bot_response(user_message, history)
 
             bot_msg = Message(
                 conversation_id=conv_id,
@@ -250,7 +251,7 @@ async def _handle_bot_response(
                     "id": bot_msg.id,
                     "conversation_id": conv_id,
                     "sender_id": bot_id,
-                    "sender_name": "MVA Support",
+                    "sender_name": bot_display_name,
                     "content": response_text,
                     "message_type": "TEXT",
                     "created_at": bot_msg.created_at.isoformat(),
@@ -539,16 +540,27 @@ async def send_message(
     return response
 
 
-@router.get("/support-bot-id")
-async def get_support_bot_id(
+@router.get("/bots")
+async def get_bots(
     current_user: Employee = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Gibt die Employee-ID des Support-Bots zurück."""
-    bot_id = await _get_bot_employee_id(db)
-    if not bot_id:
-        raise HTTPException(404, "Support-Bot nicht gefunden")
-    return {"id": bot_id}
+    """Gibt alle Bot-Mitarbeiter mit ID, Personalnummer und Name zurück."""
+    result = await db.execute(
+        select(Employee).where(
+            Employee.personnel_number.in_(BOT_PERSONNEL_NUMBERS),
+            Employee.is_active == True,
+        )
+    )
+    bots = result.scalars().all()
+    return [
+        {
+            "id": b.id,
+            "personnel_number": b.personnel_number,
+            "name": f"{b.first_name} {b.last_name}",
+        }
+        for b in bots
+    ]
 
 
 @router.get("/employees")
@@ -556,13 +568,13 @@ async def list_chat_employees(
     current_user: Employee = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Alle Mitarbeiter fuer neue Konversation auflisten (ohne Support-Bot)."""
+    """Alle Mitarbeiter fuer neue Konversation auflisten (ohne Bots)."""
     result = await db.execute(
         select(Employee)
         .where(
             Employee.is_active == True,
             Employee.id != current_user.id,
-            Employee.personnel_number != BOT_PERSONNEL_NUMBER,
+            Employee.personnel_number.notin_(BOT_PERSONNEL_NUMBERS),
         )
         .order_by(Employee.last_name, Employee.first_name)
     )
