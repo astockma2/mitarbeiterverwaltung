@@ -129,7 +129,7 @@ class TimeClockScreenState extends State<TimeClockScreen> {
   Duration _elapsedSinceClockedIn() {
     if (_status?.since == null) return Duration.zero;
     try {
-      final since = DateTime.parse(_status!.since!);
+      final since = DateTime.parse(_status!.since!).toLocal();
       return _now.difference(since);
     } catch (_) {
       return Duration.zero;
@@ -438,7 +438,7 @@ class TimeClockScreenState extends State<TimeClockScreen> {
 
   String _formatTime(String iso) {
     try {
-      final dt = DateTime.parse(iso);
+      final dt = DateTime.parse(iso).toLocal();
       return DateFormat('HH:mm').format(dt);
     } catch (_) {
       return iso;

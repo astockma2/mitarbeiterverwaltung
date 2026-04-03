@@ -20,8 +20,8 @@ class TimeEntry {
   factory TimeEntry.fromJson(Map<String, dynamic> json) {
     return TimeEntry(
       id: json['id'],
-      clockIn: DateTime.parse(json['clock_in']),
-      clockOut: json['clock_out'] != null ? DateTime.parse(json['clock_out']) : null,
+      clockIn: DateTime.parse(json['clock_in']).toLocal(),
+      clockOut: json['clock_out'] != null ? DateTime.parse(json['clock_out']).toLocal() : null,
       breakMinutes: json['break_minutes'] ?? 0,
       netHours: json['net_hours']?.toDouble(),
       entryType: json['entry_type'] ?? 'REGULAR',
