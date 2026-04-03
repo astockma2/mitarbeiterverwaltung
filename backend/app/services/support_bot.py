@@ -1,28 +1,30 @@
-"""KI-Support-Bot basierend auf Gemini 2.0 Flash."""
+"""KI-Support-Bot basierend auf Claude (Anthropic API)."""
 
-import asyncio
 import logging
+from pathlib import Path
+
+import anthropic
+
+from app.config import get_settings
 
 log = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """Du bist der MVA Support-Assistent für die Mitarbeiterverwaltung der IKK Kliniken.
+HANDBUCH_PFAD = Path(__file__).resolve().parent.parent.parent / "docs" / "benutzerhandbuch.md"
+
+SYSTEM_PROMPT = """Du bist der MVA Support-Assistent fuer die Mitarbeiterverwaltung der IKK Kliniken.
 Du hilfst Mitarbeitern bei Fragen zur Nutzung der App.
-Antworte immer auf Deutsch, kurz und verständlich.
+Antworte immer auf Deutsch, kurz und verstaendlich.
 Verwende keine technischen Begriffe.
-Wenn du etwas nicht weißt, sage: "Das weiß ich leider nicht. Bitte wenden Sie sich an die IT-Abteilung."
+Wenn du etwas nicht weisst, sage: "Das weiss ich leider nicht. Bitte wenden Sie sich an die IT-Abteilung."
 
 Hier ist das Benutzerhandbuch:
 
 {handbuch_inhalt}
 """
 
-from pathlib import Path
-
-HANDBUCH_PFAD = Path(__file__).resolve().parent.parent.parent / "docs" / "benutzerhandbuch.md"
-
 HANDBUCH_FALLBACK = """# MVA Benutzerhandbuch (Platzhalter)
 
-Die Mitarbeiterverwaltung (MVA) ermöglicht:
+Die Mitarbeiterverwaltung (MVA) ermoeglicht:
 - Zeiterfassung: Kommen/Gehen erfassen
 - Dienstplan: Eigene Schichten einsehen
 - Abwesenheiten: Urlaub beantragen
@@ -43,39 +45,38 @@ def _lade_handbuch() -> str:
 
 
 async def get_bot_response(user_message: str, conversation_history: list[dict]) -> str:
-    """Erzeugt eine Bot-Antwort über Gemini 2.0 Flash."""
+    """Erzeugt eine Bot-Antwort ueber Claude (Anthropic API)."""
     try:
-        import google.generativeai as genai
-        from app.config import get_settings
-
         settings = get_settings()
-        if not settings.gemini_api_key:
+        if not settings.anthropic_api_key:
             return (
-                "Der KI-Support ist momentan nicht verfügbar. "
+                "Der KI-Support ist momentan nicht verfuegbar. "
                 "Bitte wenden Sie sich an die IT-Abteilung."
             )
 
-        genai.configure(api_key=settings.gemini_api_key)
-        model = genai.GenerativeModel(
-            "gemini-2.0-flash",
-            system_instruction=SYSTEM_PROMPT.format(handbuch_inhalt=_lade_handbuch()),
+        client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+
+        # Conversation History als Claude Messages aufbauen
+        messages = []
+        for msg in conversation_history[-10:]:
+            role = "assistant" if msg.get("is_bot") else "user"
+            messages.append({"role": role, "content": msg["content"]})
+
+        # Aktuelle Frage
+        messages.append({"role": "user", "content": user_message})
+
+        response = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=1024,
+            system=SYSTEM_PROMPT.format(handbuch_inhalt=_lade_handbuch()),
+            messages=messages,
         )
 
-        # Letzte 10 Nachrichten als Kontext (ohne aktuelle User-Nachricht)
-        history = []
-        for msg in conversation_history[-10:]:
-            role = "model" if msg.get("is_bot") else "user"
-            history.append({"role": role, "parts": [msg["content"]]})
-
-        chat = model.start_chat(history=history)
-
-        # Synchronen API-Aufruf in Thread-Pool ausführen (nicht blockierend)
-        response = await asyncio.to_thread(chat.send_message, user_message)
-        return response.text
+        return response.content[0].text
 
     except Exception as e:
         log.error("Fehler bei Bot-Antwort: %s", e)
         return (
-            "Es ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut "
+            "Es ist ein Fehler aufgetreten. Bitte versuchen Sie es spaeter erneut "
             "oder wenden Sie sich an die IT-Abteilung."
         )

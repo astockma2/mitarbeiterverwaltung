@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     ad_enabled: bool = False  # Deaktiviert fuer Entwicklung
 
     # KI-Support-Bot
-    gemini_api_key: str = ""
+    anthropic_api_key: str = ""
 
     # App
     app_name: str = "Mitarbeiterverwaltung"
