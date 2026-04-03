@@ -78,7 +78,7 @@ async def get_employee(
     current_user: Employee = Depends(get_current_user),
 ):
     """Einzelnen Mitarbeiter mit allen Details abrufen."""
-    if not can_view_employee(current_user, employee_id):
+    if not await can_view_employee(db, current_user, employee_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Keine Berechtigung")
 
     result = await db.execute(select(Employee).where(Employee.id == employee_id))
@@ -188,7 +188,7 @@ async def list_qualifications(
     current_user: Employee = Depends(get_current_user),
 ):
     """Qualifikationen eines Mitarbeiters auflisten."""
-    if not can_view_employee(current_user, employee_id):
+    if not await can_view_employee(db, current_user, employee_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Keine Berechtigung")
 
     result = await db.execute(
