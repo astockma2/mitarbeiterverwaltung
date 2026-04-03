@@ -410,12 +410,12 @@ async def seed_demo_data():
             ),
         ]
 
-        # Support-Bot
+        # Docs-Bot
         support_bot = Employee(
             personnel_number="BOT001",
             ad_username="support-bot",
             first_name="MVA",
-            last_name="Support",
+            last_name="Docs",
             role=UserRole.EMPLOYEE,
             job_title="KI-Assistent",
             is_active=True,

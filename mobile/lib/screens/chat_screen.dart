@@ -180,11 +180,11 @@ class _ConversationTile extends StatelessWidget {
 
     return ListTile(
       onTap: onTap,
-      tileColor: isBot ? Colors.green.shade50 : null,
+      tileColor: isBot ? Colors.blue.shade50 : null,
       leading: CircleAvatar(
-        backgroundColor: isBot ? Colors.green.shade100 : Colors.blue.shade100,
+        backgroundColor: isBot ? Colors.blue.shade100 : Colors.blue.shade100,
         child: isBot
-            ? Icon(Icons.smart_toy, size: 20, color: Colors.green.shade700)
+            ? Icon(Icons.description, size: 20, color: Colors.blue.shade700)
             : Text(
                 initials,
                 style: TextStyle(

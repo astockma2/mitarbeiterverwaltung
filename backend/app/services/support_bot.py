@@ -1,45 +1,20 @@
-"""KI-Support-Bot basierend auf Gemini 2.0 Flash."""
+"""KI-Docs-Bot basierend auf Gemini 2.0 Flash."""
 
 import asyncio
 import logging
 
 log = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """Du bist der MVA Support-Assistent für die Mitarbeiterverwaltung der IKK Kliniken.
-Du hilfst Mitarbeitern bei Fragen zur Nutzung der App.
-Antworte immer auf Deutsch, kurz und verständlich.
-Verwende keine technischen Begriffe.
-Wenn du etwas nicht weißt, sage: "Das weiß ich leider nicht. Bitte wenden Sie sich an die IT-Abteilung."
+SYSTEM_PROMPT = """Du bist der MVA Docs-Assistent für die Mitarbeiterverwaltung der IKK Kliniken.
+Du hilfst Mitarbeitern beim Erstellen und Formulieren von:
+- E-Mails und Anschreiben
+- Protokollen und Berichten
+- Dokumentationen und Anleitungen
+- Formularen und Vorlagen
 
-Hier ist das Benutzerhandbuch:
-
-{handbuch_inhalt}
+Antworte immer auf Deutsch, professionell und klar.
+Frage nach wenn dir Informationen fehlen um ein gutes Dokument zu erstellen.
 """
-
-from pathlib import Path
-
-HANDBUCH_PFAD = Path(__file__).resolve().parent.parent.parent / "docs" / "benutzerhandbuch.md"
-
-HANDBUCH_FALLBACK = """# MVA Benutzerhandbuch (Platzhalter)
-
-Die Mitarbeiterverwaltung (MVA) ermöglicht:
-- Zeiterfassung: Kommen/Gehen erfassen
-- Dienstplan: Eigene Schichten einsehen
-- Abwesenheiten: Urlaub beantragen
-- Chat: Mit Kollegen kommunizieren
-- Tickets: IT-Probleme melden
-
-Bei weiteren Fragen wenden Sie sich bitte an die IT-Abteilung.
-"""
-
-
-def _lade_handbuch() -> str:
-    try:
-        with open(str(HANDBUCH_PFAD), encoding="utf-8") as f:
-            return f.read()
-    except FileNotFoundError:
-        log.warning("Benutzerhandbuch nicht gefunden: %s – verwende Platzhalter", HANDBUCH_PFAD)
-        return HANDBUCH_FALLBACK
 
 
 async def get_bot_response(user_message: str, conversation_history: list[dict]) -> str:
@@ -51,14 +26,14 @@ async def get_bot_response(user_message: str, conversation_history: list[dict]) 
         settings = get_settings()
         if not settings.gemini_api_key:
             return (
-                "Der KI-Support ist momentan nicht verfügbar. "
+                "Der KI-Assistent ist momentan nicht verfügbar. "
                 "Bitte wenden Sie sich an die IT-Abteilung."
             )
 
         genai.configure(api_key=settings.gemini_api_key)
         model = genai.GenerativeModel(
             "gemini-2.0-flash",
-            system_instruction=SYSTEM_PROMPT.format(handbuch_inhalt=_lade_handbuch()),
+            system_instruction=SYSTEM_PROMPT,
         )
 
         # Letzte 10 Nachrichten als Kontext (ohne aktuelle User-Nachricht)

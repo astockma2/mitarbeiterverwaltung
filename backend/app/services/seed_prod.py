@@ -12,20 +12,20 @@ logger = logging.getLogger(__name__)
 
 
 async def seed_bot_user():
-    """Stellt sicher dass der Support-Bot-User existiert (idempotent)."""
+    """Stellt sicher dass der Docs-Bot-User existiert (idempotent)."""
     async with async_session() as db:
         existing = await db.execute(
             select(Employee).where(Employee.personnel_number == "BOT001")
         )
         if existing.scalar_one_or_none() is not None:
-            logger.info("Support-Bot bereits vorhanden, übersprungen")
+            logger.info("Docs-Bot bereits vorhanden, übersprungen")
             return
 
         bot = Employee(
             personnel_number="BOT001",
             ad_username="support-bot",
             first_name="MVA",
-            last_name="Support",
+            last_name="Docs",
             role=UserRole.EMPLOYEE,
             job_title="KI-Assistent",
             is_active=True,
@@ -37,4 +37,4 @@ async def seed_bot_user():
         )
         db.add(bot)
         await db.commit()
-        logger.info("Support-Bot-User 'BOT001' angelegt")
+        logger.info("Docs-Bot-User 'BOT001' angelegt")

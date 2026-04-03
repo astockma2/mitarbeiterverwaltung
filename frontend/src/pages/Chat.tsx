@@ -334,12 +334,12 @@ export default function Chat({ userId }: Props) {
                   style={{
                     padding: '12px 16px', cursor: 'pointer',
                     borderBottom: '1px solid #f1f5f9',
-                    background: activeConv?.id === c.id ? '#eff6ff' : isBot ? '#f0fdf4' : 'transparent',
+                    background: activeConv?.id === c.id ? '#eff6ff' : isBot ? '#eff6ff' : 'transparent',
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: 14, fontWeight: c.unread_count > 0 ? 700 : 500, display: 'flex', alignItems: 'center', gap: 5 }}>
-                      {isBot && <Bot size={13} color="#16a34a" />}
+                      {isBot && <Bot size={13} color="#2563eb" />}
                       {c.name}
                     </span>
                     {c.unread_count > 0 && (
