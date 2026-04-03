@@ -410,8 +410,25 @@ async def seed_demo_data():
             ),
         ]
 
+        # Support-Bot
+        support_bot = Employee(
+            personnel_number="BOT001",
+            ad_username="support-bot",
+            first_name="MVA",
+            last_name="Support",
+            role=UserRole.EMPLOYEE,
+            job_title="KI-Assistent",
+            is_active=True,
+            department_id=None,
+            employment_type=EmploymentType.FULLTIME,
+            weekly_hours=0.0,
+            hire_date=date(2024, 1, 1),
+            vacation_days_per_year=0,
+        )
+
         db.add(admin)
         db.add(hr_user)
+        db.add(support_bot)
         for emp in employees:
             db.add(emp)
 
@@ -515,8 +532,8 @@ async def seed_demo_data():
 
         await db.commit()
         logger.info(
-            "Demo-Daten erstellt: %d Abteilungen, %d Mitarbeiter, %d Schichtvorlagen + Dienstplaene",
+            "Demo-Daten erstellt: %d Abteilungen, %d Mitarbeiter (inkl. Support-Bot), %d Schichtvorlagen + Dienstplaene",
             len(departments),
-            len(employees) + 2,
+            len(employees) + 3,
             len(shift_templates),
         )
