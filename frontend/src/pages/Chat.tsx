@@ -73,9 +73,10 @@ export default function Chat({ userId }: Props) {
     const token = localStorage.getItem('access_token');
     if (token) {
       const connect = () => {
-        const wsHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-          ? '127.0.0.1' : window.location.hostname;
-        const wsUrl = `ws://${wsHost}:8000/api/v1/chat/ws`;
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsHost = isLocal ? '127.0.0.1:8000' : window.location.host;
+        const wsUrl = `${wsProtocol}//${wsHost}/api/v1/chat/ws`;
         const socket = new WebSocket(wsUrl);
 
         // Token als erste Nachricht nach dem Handshake senden (nicht in der URL)

@@ -13,7 +13,7 @@ class ApiService {
   // Konfigurierbar via: flutter run --dart-define=API_URL=http://192.168.1.100:8000/api/v1
   static String baseUrl = const String.fromEnvironment(
     'API_URL',
-    defaultValue: 'https://gui-martha-works-fda.trycloudflare.com/api/v1',
+    defaultValue: 'https://mva.c3po42.de/api/v1',
   );
 
   static final _storage = FlutterSecureStorage();
