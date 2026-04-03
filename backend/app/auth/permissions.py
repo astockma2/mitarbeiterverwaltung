@@ -1,6 +1,8 @@
 from functools import wraps
 
 from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.employee import Employee, UserRole
 
@@ -36,13 +38,19 @@ def is_manager(user: Employee) -> bool:
     )
 
 
-def can_view_employee(viewer: Employee, target_employee_id: int) -> bool:
-    """Prueft ob ein Benutzer die Daten eines anderen Mitarbeiters sehen darf."""
+async def can_view_employee(db: AsyncSession, viewer: Employee, target_employee_id: int) -> bool:
+    """Prüft ob ein Benutzer die Daten eines anderen Mitarbeiters sehen darf.
+
+    ADMIN und HR sehen alle Mitarbeiter.
+    DEPARTMENT_MANAGER und TEAM_LEADER sehen nur Mitarbeiter ihrer eigenen Abteilung.
+    Alle Benutzer können ihre eigenen Daten einsehen.
+    """
     if viewer.role in (UserRole.ADMIN, UserRole.HR):
         return True
     if viewer.id == target_employee_id:
         return True
-    # Abteilungsleiter sehen ihre Abteilung
     if viewer.role in (UserRole.DEPARTMENT_MANAGER, UserRole.TEAM_LEADER):
-        return True  # Wird spaeter verfeinert mit Abteilungspruefung
+        result = await db.execute(select(Employee).where(Employee.id == target_employee_id))
+        target = result.scalar_one_or_none()
+        return target is not None and target.department_id == viewer.department_id
     return False
