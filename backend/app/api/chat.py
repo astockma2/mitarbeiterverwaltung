@@ -1,23 +1,26 @@
 """Chat-API: Konversationen, Nachrichten, WebSocket-Echtzeit."""
 
-import json
+import asyncio
 import logging
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, WebSocket, WebSocketDisconnect, Query
 from pydantic import BaseModel
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.auth.jwt import get_current_user
-from app.database import get_db
+from app.database import async_session, get_db
 from app.models.employee import Employee
 from app.models.message import Conversation, ConversationMember, Message
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 log = logging.getLogger(__name__)
+
+# Referenz auf laufende Bot-Tasks (verhindert Garbage Collection)
+_bot_tasks: set[asyncio.Task] = set()
 
 
 # ── WebSocket Connection Manager ──────────────────────────────────
@@ -127,6 +130,13 @@ async def websocket_endpoint(websocket: WebSocket):
                         if msg:
                             members = await _get_member_ids(db, conv_id)
                             await manager.send_to_conversation(members, msg)
+                            bot_id = await _find_bot_in_direct_conv(db, conv_id)
+                            if bot_id:
+                                task = asyncio.create_task(
+                                    _handle_bot_response(conv_id, content, bot_id, members)
+                                )
+                                _bot_tasks.add(task)
+                                task.add_done_callback(_bot_tasks.discard)
 
             elif action == "typing":
                 conv_id = data.get("conversation_id")
@@ -162,6 +172,92 @@ async def _broadcast_online_status():
     data = {"type": "online_status", "online_users": online}
     for uid in online:
         await manager.send_to_user(uid, data)
+
+
+# ── Bot-Hilfsfunktionen ──────────────────────────────────────────
+
+BOT_PERSONNEL_NUMBER = "BOT001"
+
+
+async def _get_bot_employee_id(db: AsyncSession) -> int | None:
+    """Gibt die Datenbank-ID des Support-Bots zurück."""
+    result = await db.execute(
+        select(Employee.id).where(
+            Employee.personnel_number == BOT_PERSONNEL_NUMBER,
+            Employee.is_active == True,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def _find_bot_in_direct_conv(db: AsyncSession, conversation_id: int) -> int | None:
+    """Gibt die Bot-ID zurück wenn die Konversation eine DIRECT-Unterhaltung mit dem Bot ist."""
+    conv_q = await db.execute(
+        select(Conversation.type).where(Conversation.id == conversation_id)
+    )
+    conv_type = conv_q.scalar_one_or_none()
+    if conv_type != "DIRECT":
+        return None
+
+    bot_q = await db.execute(
+        select(Employee.id)
+        .join(ConversationMember, Employee.id == ConversationMember.employee_id)
+        .where(
+            ConversationMember.conversation_id == conversation_id,
+            Employee.personnel_number == BOT_PERSONNEL_NUMBER,
+        )
+    )
+    return bot_q.scalar_one_or_none()
+
+
+async def _handle_bot_response(
+    conv_id: int, user_message: str, bot_id: int, member_ids: list[int]
+):
+    """Generiert die Bot-Antwort und speichert/sendet sie asynchron."""
+    from app.services.support_bot import get_bot_response
+
+    try:
+        async with async_session() as db:
+            # Letzte 10 Nachrichten als Kontext laden
+            history_q = await db.execute(
+                select(Message)
+                .where(Message.conversation_id == conv_id, Message.is_deleted == False)
+                .order_by(Message.created_at.desc())
+                .limit(10)
+            )
+            history_msgs = list(reversed(history_q.scalars().all()))
+            history = [
+                {"content": m.content, "is_bot": m.sender_id == bot_id}
+                for m in history_msgs[:-1]
+            ]
+
+            response_text = await get_bot_response(user_message, history)
+
+            bot_msg = Message(
+                conversation_id=conv_id,
+                sender_id=bot_id,
+                content=response_text,
+                message_type="TEXT",
+            )
+            db.add(bot_msg)
+            await db.commit()
+            await db.refresh(bot_msg)
+
+            await manager.send_to_conversation(
+                member_ids,
+                {
+                    "type": "new_message",
+                    "id": bot_msg.id,
+                    "conversation_id": conv_id,
+                    "sender_id": bot_id,
+                    "sender_name": "MVA Support",
+                    "content": response_text,
+                    "message_type": "TEXT",
+                    "created_at": bot_msg.created_at.isoformat(),
+                },
+            )
+    except Exception as e:
+        log.error("Fehler bei Bot-Antwort für Konversation %d: %s", conv_id, e)
 
 
 # ── REST-Endpoints ───────────────────────────────────────────────
@@ -387,6 +483,7 @@ async def get_messages(
 async def send_message(
     conversation_id: int,
     data: MessageCreate,
+    background_tasks: BackgroundTasks,
     current_user: Employee = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -428,7 +525,30 @@ async def send_message(
         **response,
     })
 
+    # Bot-Antwort auslösen falls Empfänger der Support-Bot ist
+    bot_id = await _find_bot_in_direct_conv(db, conversation_id)
+    if bot_id:
+        background_tasks.add_task(
+            _handle_bot_response,
+            conversation_id,
+            data.content.strip(),
+            bot_id,
+            member_ids,
+        )
+
     return response
+
+
+@router.get("/support-bot-id")
+async def get_support_bot_id(
+    current_user: Employee = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Gibt die Employee-ID des Support-Bots zurück."""
+    bot_id = await _get_bot_employee_id(db)
+    if not bot_id:
+        raise HTTPException(404, "Support-Bot nicht gefunden")
+    return {"id": bot_id}
 
 
 @router.get("/employees")
@@ -436,10 +556,14 @@ async def list_chat_employees(
     current_user: Employee = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Alle Mitarbeiter fuer neue Konversation auflisten."""
+    """Alle Mitarbeiter fuer neue Konversation auflisten (ohne Support-Bot)."""
     result = await db.execute(
         select(Employee)
-        .where(Employee.is_active == True, Employee.id != current_user.id)
+        .where(
+            Employee.is_active == True,
+            Employee.id != current_user.id,
+            Employee.personnel_number != BOT_PERSONNEL_NUMBER,
+        )
         .order_by(Employee.last_name, Employee.first_name)
     )
     employees = result.scalars().all()

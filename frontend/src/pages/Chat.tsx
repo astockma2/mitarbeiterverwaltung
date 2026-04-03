@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { Send, Plus, MessageCircle, Circle, Search, ChevronDown, ChevronRight } from 'lucide-react';
-import { getConversations, getMessages, sendMessage, getChatEmployees, createConversation } from '../services/api';
+import { Send, Plus, MessageCircle, Circle, Search, ChevronDown, ChevronRight, Bot } from 'lucide-react';
+import { getConversations, getMessages, sendMessage, getChatEmployees, createConversation, getSupportBotId } from '../services/api';
 
 interface Props {
   userId: number;
@@ -15,6 +15,7 @@ export default function Chat({ userId }: Props) {
   const [showNewChat, setShowNewChat] = useState(false);
   const [empSearch, setEmpSearch] = useState('');
   const [collapsedDepts, setCollapsedDepts] = useState<Set<string>>(new Set());
+  const [botEmployeeId, setBotEmployeeId] = useState<number | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeConvRef = useRef<any>(null);
@@ -25,14 +26,49 @@ export default function Chat({ userId }: Props) {
     activeConvRef.current = activeConv;
   }, [activeConv]);
 
-  // Konversationen laden
-  const loadConversations = useCallback(() => {
-    getConversations().then((r) => setConversations(r.data));
+  // Bot-ID einmalig laden und Bot-Konversation sicherstellen
+  useEffect(() => {
+    getSupportBotId()
+      .then((r) => setBotEmployeeId(r.data.id))
+      .catch(() => {});
   }, []);
+
+  // Konversationen laden, Bot-Konversation immer an Position 1
+  const loadConversations = useCallback(async () => {
+    const r = await getConversations();
+    const convs: any[] = r.data;
+
+    if (botEmployeeId) {
+      const hasBot = convs.some((c) =>
+        c.type === 'DIRECT' &&
+        c.members?.some((m: any) => m.id === botEmployeeId)
+      );
+      if (!hasBot) {
+        try {
+          await createConversation({ type: 'DIRECT', member_ids: [botEmployeeId] });
+          const r2 = await getConversations();
+          convs.splice(0, convs.length, ...r2.data);
+        } catch {}
+      }
+    }
+
+    // Bot-Konversation an Position 1 sortieren
+    convs.sort((a, b) => {
+      const aIsBot = botEmployeeId != null && a.members?.some((m: any) => m.id === botEmployeeId);
+      const bIsBot = botEmployeeId != null && b.members?.some((m: any) => m.id === botEmployeeId);
+      if (aIsBot && !bIsBot) return -1;
+      if (!aIsBot && bIsBot) return 1;
+      const aTime = a.last_message?.created_at ?? '';
+      const bTime = b.last_message?.created_at ?? '';
+      return bTime.localeCompare(aTime);
+    });
+
+    setConversations(convs);
+  }, [botEmployeeId]);
 
   // WebSocket verbinden
   useEffect(() => {
-    loadConversations();
+    loadConversations().catch(() => {});
 
     const token = localStorage.getItem('access_token');
     if (token) {
@@ -58,7 +94,7 @@ export default function Chat({ userId }: Props) {
                 return [...prev, data];
               });
             }
-            loadConversations();
+            loadConversations().catch(() => {});
           }
         };
 
@@ -89,7 +125,7 @@ export default function Chat({ userId }: Props) {
   useEffect(() => {
     // Konversationsliste alle 10s aktualisieren
     pollRef.current = setInterval(() => {
-      loadConversations();
+      loadConversations().catch(() => {});
       // Aktive Konversation Nachrichten neu laden
       const conv = activeConvRef.current;
       if (conv) {
@@ -119,7 +155,7 @@ export default function Chat({ userId }: Props) {
       if (ws?.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ action: 'read', conversation_id: conv.id }));
       }
-      loadConversations();
+      loadConversations().catch(() => {});
     } catch {
       setMessages([]);
     }
@@ -142,7 +178,7 @@ export default function Chat({ userId }: Props) {
       try {
         const r = await sendMessage(activeConv.id, text);
         setMessages((prev) => [...prev, r.data]);
-        loadConversations();
+        loadConversations().catch(() => {});
       } catch {}
     }
   };
@@ -155,10 +191,12 @@ export default function Chat({ userId }: Props) {
         member_ids: [employeeId],
       });
       setShowNewChat(false);
-      const convR = await getConversations();
-      setConversations(convR.data);
-      const conv = convR.data.find((c: any) => c.id === r.data.id);
-      if (conv) openConversation(conv);
+      await loadConversations();
+      setConversations((prev) => {
+        const conv = prev.find((c: any) => c.id === r.data.id);
+        if (conv) openConversation(conv);
+        return prev;
+      });
     } catch {}
   };
 
@@ -288,17 +326,20 @@ export default function Chat({ userId }: Props) {
           ) : (
             // Konversationsliste
             <>
-              {conversations.map((c) => (
+              {conversations.map((c) => {
+                const isBot = botEmployeeId != null && c.members?.some((m: any) => m.id === botEmployeeId);
+                return (
                 <div key={c.id}
                   onClick={() => openConversation(c)}
                   style={{
                     padding: '12px 16px', cursor: 'pointer',
                     borderBottom: '1px solid #f1f5f9',
-                    background: activeConv?.id === c.id ? '#eff6ff' : 'transparent',
+                    background: activeConv?.id === c.id ? '#eff6ff' : isBot ? '#f0fdf4' : 'transparent',
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 14, fontWeight: c.unread_count > 0 ? 700 : 500 }}>
+                    <span style={{ fontSize: 14, fontWeight: c.unread_count > 0 ? 700 : 500, display: 'flex', alignItems: 'center', gap: 5 }}>
+                      {isBot && <Bot size={13} color="#16a34a" />}
                       {c.name}
                     </span>
                     {c.unread_count > 0 && (
@@ -318,7 +359,8 @@ export default function Chat({ userId }: Props) {
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
               {conversations.length === 0 && (
                 <div style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
                   Keine Konversationen.{'\n'}Starte einen neuen Chat!

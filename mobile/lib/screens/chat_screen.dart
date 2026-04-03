@@ -17,17 +17,57 @@ class ChatListScreen extends StatefulWidget {
 class _ChatListScreenState extends State<ChatListScreen> {
   List<ChatConversation> _conversations = [];
   bool _loading = true;
+  int? _botEmployeeId;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _initBotAndLoad();
+  }
+
+  Future<void> _initBotAndLoad() async {
+    _botEmployeeId = await ApiService.getSupportBotId();
+    await _load();
   }
 
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      _conversations = await ApiService.getConversations();
+      List<ChatConversation> convs = await ApiService.getConversations();
+
+      // Bot-Konversation automatisch anlegen falls nicht vorhanden
+      if (_botEmployeeId != null) {
+        final hasBot = convs.any((c) =>
+          c.type == 'DIRECT' &&
+          c.members.any((m) => m.id == _botEmployeeId)
+        );
+        if (!hasBot) {
+          try {
+            await ApiService.createConversation(
+              type: 'DIRECT',
+              memberIds: [_botEmployeeId!],
+            );
+            convs = await ApiService.getConversations();
+          } catch (_) {}
+        }
+      }
+
+      // Bot-Konversation immer an erste Stelle sortieren
+      convs.sort((a, b) {
+        final aIsBot = _botEmployeeId != null &&
+            a.type == 'DIRECT' &&
+            a.members.any((m) => m.id == _botEmployeeId);
+        final bIsBot = _botEmployeeId != null &&
+            b.type == 'DIRECT' &&
+            b.members.any((m) => m.id == _botEmployeeId);
+        if (aIsBot && !bIsBot) return -1;
+        if (!aIsBot && bIsBot) return 1;
+        final aTime = a.lastMessage?.createdAt ?? '';
+        final bTime = b.lastMessage?.createdAt ?? '';
+        return bTime.compareTo(aTime);
+      });
+
+      _conversations = convs;
     } catch (_) {}
     setState(() => _loading = false);
   }
@@ -103,8 +143,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           Divider(height: 1, indent: 72),
                       itemBuilder: (_, i) {
                         final conv = _conversations[i];
+                        final isBot = _botEmployeeId != null &&
+                            conv.type == 'DIRECT' &&
+                            conv.members.any((m) => m.id == _botEmployeeId);
                         return _ConversationTile(
                           conversation: conv,
+                          isBot: isBot,
                           onTap: () => _openConversation(conv),
                         );
                       },
@@ -116,9 +160,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
 class _ConversationTile extends StatelessWidget {
   final ChatConversation conversation;
+  final bool isBot;
   final VoidCallback onTap;
 
-  const _ConversationTile({required this.conversation, required this.onTap});
+  const _ConversationTile({
+    required this.conversation,
+    required this.isBot,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -131,23 +180,34 @@ class _ConversationTile extends StatelessWidget {
 
     return ListTile(
       onTap: onTap,
+      tileColor: isBot ? Colors.green.shade50 : null,
       leading: CircleAvatar(
-        backgroundColor: Colors.blue.shade100,
-        child: Text(
-          initials,
-          style: TextStyle(
-            color: Colors.blue.shade700,
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-          ),
-        ),
+        backgroundColor: isBot ? Colors.green.shade100 : Colors.blue.shade100,
+        child: isBot
+            ? Icon(Icons.smart_toy, size: 20, color: Colors.green.shade700)
+            : Text(
+                initials,
+                style: TextStyle(
+                  color: Colors.blue.shade700,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
       ),
-      title: Text(
-        conversation.name,
-        style: TextStyle(
-          fontWeight:
-              conversation.unreadCount > 0 ? FontWeight.w700 : FontWeight.w500,
-        ),
+      title: Row(
+        children: [
+          if (isBot) ...[
+            Icon(Icons.circle, size: 8, color: Colors.green.shade500),
+            const SizedBox(width: 6),
+          ],
+          Text(
+            conversation.name,
+            style: TextStyle(
+              fontWeight:
+                  conversation.unreadCount > 0 ? FontWeight.w700 : FontWeight.w500,
+            ),
+          ),
+        ],
       ),
       subtitle: conversation.lastMessage?.content != null
           ? Text(

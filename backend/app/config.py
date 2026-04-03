@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     ad_group_manager: str = "APP-Mitarbeiterverwaltung-Leitung"
     ad_enabled: bool = False  # Deaktiviert fuer Entwicklung
 
+    # KI-Support-Bot
+    gemini_api_key: str = ""
+
     # App
     app_name: str = "Mitarbeiterverwaltung"
     app_env: str = "development"

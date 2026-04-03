@@ -225,6 +225,15 @@ class ApiService {
     return (data as List).map((e) => ChatEmployee.fromJson(e)).toList();
   }
 
+  static Future<int?> getSupportBotId() async {
+    try {
+      final data = await _get('/chat/support-bot-id');
+      return data['id'] as int?;
+    } catch (_) {
+      return null;
+    }
+  }
+
   static String get wsUrl {
     return baseUrl.replaceFirst('http', 'ws').replaceFirst('/api/v1', '');
   }
