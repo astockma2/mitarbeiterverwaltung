@@ -60,3 +60,13 @@ class Message(Base):
     is_deleted = Column(Boolean, default=False)
 
     conversation = relationship("Conversation", back_populates="messages")
+
+
+class DeviceToken(Base):
+    __tablename__ = "device_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"), nullable=False)
+    fcm_token = Column(String(500), nullable=False, unique=True)
+    device_type = Column(String(20), default="android")  # android, web
+    created_at = Column(DateTime, default=datetime.utcnow)

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { Send, Plus, MessageCircle, Circle, Search, ChevronDown, ChevronRight, Bot } from 'lucide-react';
-import { getConversations, getMessages, sendMessage, getChatEmployees, createConversation, getSupportBotId } from '../services/api';
+import { Send, Plus, MessageCircle, Circle, Search, ChevronDown, ChevronRight, Bot, Users, UserPlus, UserMinus, Pencil, X, Check, Paperclip, Download, Image } from 'lucide-react';
+import { getConversations, getMessages, sendMessage, getChatEmployees, createConversation, getSupportBotId, updateConversation, updateMembers, uploadChatFile, getChatFileUrl } from '../services/api';
 
 interface Props {
   userId: number;
@@ -13,9 +13,18 @@ export default function Chat({ userId }: Props) {
   const [input, setInput] = useState('');
   const [employees, setEmployees] = useState<any[]>([]);
   const [showNewChat, setShowNewChat] = useState(false);
+  const [newChatMode, setNewChatMode] = useState<'direct' | 'group'>('direct');
+  const [groupName, setGroupName] = useState('');
+  const [selectedMembers, setSelectedMembers] = useState<number[]>([]);
   const [empSearch, setEmpSearch] = useState('');
   const [collapsedDepts, setCollapsedDepts] = useState<Set<string>>(new Set());
   const [botEmployeeId, setBotEmployeeId] = useState<number | null>(null);
+  const [showMemberPanel, setShowMemberPanel] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeConvRef = useRef<any>(null);
@@ -76,6 +85,13 @@ export default function Chat({ userId }: Props) {
     loadConversations().catch(() => {});
   }, [loadConversations]);
 
+  // Browser-Notification-Berechtigung anfragen
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
   // WebSocket einmalig beim Mount aufbauen (keine Abhängigkeit von loadConversations,
   // da sonst bei botEmployeeId-Laden eine Race Condition entsteht: WS schließen + neu öffnen)
   useEffect(() => {
@@ -104,6 +120,26 @@ export default function Chat({ userId }: Props) {
               if (prev.some((m) => m.id === data.id)) return prev;
               return [...prev, data];
             });
+          }
+          // Browser-Notification wenn Tab nicht aktiv und Nachricht nicht von mir
+          if (document.hidden && data.sender_id !== userId && 'Notification' in window && Notification.permission === 'granted') {
+            new Notification(`${data.sender_name}`, {
+              body: data.message_type === 'IMAGE' ? '📷 Bild' : data.message_type === 'FILE' ? '📎 Datei' : data.content,
+              icon: '/favicon.ico',
+              tag: `chat-${data.conversation_id}`,
+            });
+          }
+          loadConversationsRef.current?.().catch(() => {});
+        } else if (data.type === 'conversation_updated') {
+          const currentConv = activeConvRef.current;
+          if (currentConv && currentConv.id === data.conversation_id) {
+            setActiveConv((prev: any) => prev ? { ...prev, name: data.name } : prev);
+          }
+          loadConversationsRef.current?.().catch(() => {});
+        } else if (data.type === 'members_updated') {
+          const currentConv = activeConvRef.current;
+          if (currentConv && currentConv.id === data.conversation_id) {
+            setActiveConv((prev: any) => prev ? { ...prev, members: data.members } : prev);
           }
           loadConversationsRef.current?.().catch(() => {});
         }
@@ -210,14 +246,101 @@ export default function Chat({ userId }: Props) {
     } catch {}
   };
 
+  // Gruppe erstellen
+  const createGroup = async () => {
+    if (!groupName.trim() || selectedMembers.length === 0) return;
+    try {
+      const r = await createConversation({
+        type: 'GROUP',
+        name: groupName.trim(),
+        member_ids: selectedMembers,
+      });
+      setShowNewChat(false);
+      setGroupName('');
+      setSelectedMembers([]);
+      setNewChatMode('direct');
+      await loadConversations();
+      setConversations((prev) => {
+        const conv = prev.find((c: any) => c.id === r.data.id);
+        if (conv) openConversation(conv);
+        return prev;
+      });
+    } catch {}
+  };
+
+  // Mitglied-Toggle fuer Gruppenerstellung
+  const toggleMember = (id: number) => {
+    setSelectedMembers((prev) =>
+      prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]
+    );
+  };
+
+  // Gruppe umbenennen
+  const renameGroup = async () => {
+    if (!activeConv || !newName.trim()) return;
+    try {
+      await updateConversation(activeConv.id, { name: newName.trim() });
+      setActiveConv({ ...activeConv, name: newName.trim() });
+      setEditingName(false);
+      loadConversations().catch(() => {});
+    } catch {}
+  };
+
+  // Mitglied zur aktiven Gruppe hinzufuegen
+  const addMemberToGroup = async (empId: number) => {
+    if (!activeConv) return;
+    try {
+      const r = await updateMembers(activeConv.id, { add: [empId] });
+      setActiveConv({ ...activeConv, members: r.data.members });
+      loadConversations().catch(() => {});
+    } catch {}
+  };
+
+  // Mitglied aus aktiver Gruppe entfernen
+  const removeMemberFromGroup = async (empId: number) => {
+    if (!activeConv) return;
+    try {
+      const r = await updateMembers(activeConv.id, { remove: [empId] });
+      setActiveConv({ ...activeConv, members: r.data.members });
+      loadConversations().catch(() => {});
+    } catch {}
+  };
+
+  // Datei hochladen
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeConv) return;
+    e.target.value = '';
+
+    if (file.size > 20 * 1024 * 1024) {
+      alert('Datei zu gross (max 20 MB)');
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress(0);
+    try {
+      await uploadChatFile(activeConv.id, file, (pct) => setUploadProgress(pct));
+      loadConversations().catch(() => {});
+    } catch {
+      alert('Fehler beim Hochladen');
+    }
+    setUploading(false);
+  };
+
   // Mitarbeiter laden wenn "Neuer Chat" geoeffnet
   useEffect(() => {
-    if (showNewChat) {
+    if (showNewChat || showMemberPanel) {
       getChatEmployees().then((r) => setEmployees(r.data));
       setEmpSearch('');
       setCollapsedDepts(new Set());
     }
-  }, [showNewChat]);
+    if (!showNewChat) {
+      setNewChatMode('direct');
+      setGroupName('');
+      setSelectedMembers([]);
+    }
+  }, [showNewChat, showMemberPanel]);
 
   // Mitarbeiter filtern und nach Abteilung gruppieren
   const groupedEmployees = useMemo(() => {
@@ -267,6 +390,54 @@ export default function Chat({ userId }: Props) {
         <div style={{ flex: 1, overflow: 'auto' }}>
           {showNewChat ? (
             <div>
+              {/* Tabs: Direkt / Gruppe */}
+              <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0' }}>
+                <button onClick={() => setNewChatMode('direct')} style={{
+                  flex: 1, padding: '8px', fontSize: 13, fontWeight: 500, border: 'none',
+                  cursor: 'pointer', background: newChatMode === 'direct' ? '#fff' : '#f8fafc',
+                  borderBottom: newChatMode === 'direct' ? '2px solid #3b82f6' : '2px solid transparent',
+                  color: newChatMode === 'direct' ? '#3b82f6' : '#64748b',
+                }}>Direktnachricht</button>
+                <button onClick={() => setNewChatMode('group')} style={{
+                  flex: 1, padding: '8px', fontSize: 13, fontWeight: 500, border: 'none',
+                  cursor: 'pointer', background: newChatMode === 'group' ? '#fff' : '#f8fafc',
+                  borderBottom: newChatMode === 'group' ? '2px solid #3b82f6' : '2px solid transparent',
+                  color: newChatMode === 'group' ? '#3b82f6' : '#64748b',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                }}>
+                  <Users size={13} /> Gruppe
+                </button>
+              </div>
+
+              {/* Gruppenname + Erstellen-Button */}
+              {newChatMode === 'group' && (
+                <div style={{ padding: '8px 12px', borderBottom: '1px solid #e2e8f0' }}>
+                  <input
+                    placeholder="Gruppenname..."
+                    value={groupName}
+                    onChange={(e) => setGroupName(e.target.value)}
+                    style={{
+                      width: '100%', padding: '6px 10px', borderRadius: 6,
+                      border: '1px solid #d1d5db', fontSize: 13, boxSizing: 'border-box',
+                      marginBottom: 6,
+                    }}
+                  />
+                  {selectedMembers.length > 0 && (
+                    <div style={{ fontSize: 12, color: '#64748b', marginBottom: 6 }}>
+                      {selectedMembers.length} Mitglied{selectedMembers.length !== 1 ? 'er' : ''} ausgewaehlt
+                    </div>
+                  )}
+                  <button onClick={createGroup} disabled={!groupName.trim() || selectedMembers.length === 0}
+                    style={{
+                      width: '100%', padding: '6px', borderRadius: 6, border: 'none',
+                      background: groupName.trim() && selectedMembers.length > 0 ? '#3b82f6' : '#e2e8f0',
+                      color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                    }}>
+                    Gruppe erstellen
+                  </button>
+                </div>
+              )}
+
               {/* Suchfeld */}
               <div style={{ padding: '8px 12px' }}>
                 <div style={{ position: 'relative' }}>
@@ -301,13 +472,21 @@ export default function Chat({ userId }: Props) {
                       {deptName} ({emps.length})
                     </div>
                     {!collapsed && emps.map((e: any) => (
-                      <div key={e.id} onClick={() => startNewChat(e.id)} style={{
-                        padding: '8px 16px', cursor: 'pointer', display: 'flex',
-                        alignItems: 'center', gap: 10, borderBottom: '1px solid #f1f5f9',
-                        transition: 'background 0.15s',
-                      }}
-                      onMouseEnter={(ev) => ev.currentTarget.style.background = '#f8fafc'}
-                      onMouseLeave={(ev) => ev.currentTarget.style.background = ''}>
+                      <div key={e.id}
+                        onClick={() => newChatMode === 'direct' ? startNewChat(e.id) : toggleMember(e.id)}
+                        style={{
+                          padding: '8px 16px', cursor: 'pointer', display: 'flex',
+                          alignItems: 'center', gap: 10, borderBottom: '1px solid #f1f5f9',
+                          transition: 'background 0.15s',
+                          background: selectedMembers.includes(e.id) ? '#eff6ff' : '',
+                        }}
+                        onMouseEnter={(ev) => { if (!selectedMembers.includes(e.id)) ev.currentTarget.style.background = '#f8fafc'; }}
+                        onMouseLeave={(ev) => { if (!selectedMembers.includes(e.id)) ev.currentTarget.style.background = ''; }}>
+                        {newChatMode === 'group' && (
+                          <input type="checkbox" checked={selectedMembers.includes(e.id)}
+                            onChange={() => toggleMember(e.id)}
+                            style={{ accentColor: '#3b82f6' }} />
+                        )}
                         <div style={{
                           width: 32, height: 32, borderRadius: '50%',
                           background: '#e0e7ff', display: 'flex', alignItems: 'center',
@@ -338,6 +517,7 @@ export default function Chat({ userId }: Props) {
             <>
               {conversations.map((c) => {
                 const isBot = botEmployeeId != null && c.members?.some((m: any) => m.id === botEmployeeId);
+                const isGroup = c.type === 'GROUP';
                 return (
                 <div key={c.id}
                   onClick={() => openConversation(c)}
@@ -350,6 +530,7 @@ export default function Chat({ userId }: Props) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: 14, fontWeight: c.unread_count > 0 ? 700 : 500, display: 'flex', alignItems: 'center', gap: 5 }}>
                       {isBot && <Bot size={13} color="#16a34a" />}
+                      {isGroup && !isBot && <Users size={13} color="#6366f1" />}
                       {c.name}
                     </span>
                     {c.unread_count > 0 && (
@@ -388,13 +569,104 @@ export default function Chat({ userId }: Props) {
             {/* Header */}
             <div style={{
               padding: '12px 20px', borderBottom: '1px solid #e2e8f0',
-              background: '#fff', fontWeight: 600, fontSize: 15,
+              background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             }}>
-              {activeConv.name}
-              <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 8, fontWeight: 400 }}>
-                {activeConv.members?.length} Teilnehmer
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {editingName ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <input value={newName} onChange={(e) => setNewName(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && renameGroup()}
+                      autoFocus
+                      style={{ fontSize: 15, fontWeight: 600, border: '1px solid #d1d5db', borderRadius: 4, padding: '2px 6px' }} />
+                    <button onClick={renameGroup} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}>
+                      <Check size={16} color="#22c55e" />
+                    </button>
+                    <button onClick={() => setEditingName(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}>
+                      <X size={16} color="#ef4444" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <span style={{ fontWeight: 600, fontSize: 15 }}>{activeConv.name}</span>
+                    {activeConv.type !== 'DIRECT' && (
+                      <button onClick={() => { setNewName(activeConv.name); setEditingName(true); }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}>
+                        <Pencil size={13} color="#94a3b8" />
+                      </button>
+                    )}
+                  </>
+                )}
+                <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 400 }}>
+                  {activeConv.members?.length} Teilnehmer
+                </span>
+              </div>
+              {activeConv.type !== 'DIRECT' && (
+                <button onClick={() => setShowMemberPanel(!showMemberPanel)}
+                  style={{
+                    background: showMemberPanel ? '#eff6ff' : 'none', border: '1px solid #e2e8f0',
+                    borderRadius: 6, padding: '4px 8px', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#64748b',
+                  }}>
+                  <Users size={14} /> Mitglieder
+                </button>
+              )}
             </div>
+
+            {/* Mitglieder-Panel (nur fuer Gruppen) */}
+            {showMemberPanel && activeConv.type !== 'DIRECT' && (
+              <div style={{
+                borderBottom: '1px solid #e2e8f0', background: '#fafbfc',
+                padding: '10px 16px', maxHeight: 250, overflowY: 'auto',
+              }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 }}>
+                  Mitglieder ({activeConv.members?.length})
+                </div>
+                {activeConv.members?.map((m: any) => (
+                  <div key={m.id} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '4px 0', fontSize: 13,
+                  }}>
+                    <span>{m.name}</span>
+                    {m.id !== userId && m.id !== activeConv.created_by && (
+                      <button onClick={() => removeMemberFromGroup(m.id)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}
+                        title="Entfernen">
+                        <UserMinus size={14} color="#ef4444" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <div style={{ marginTop: 8, borderTop: '1px solid #e2e8f0', paddingTop: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+                    Hinzufuegen
+                  </div>
+                  <div style={{ position: 'relative', marginBottom: 6 }}>
+                    <Search size={12} style={{ position: 'absolute', left: 6, top: 7, color: '#94a3b8' }} />
+                    <input placeholder="Suchen..." value={empSearch} onChange={(e) => setEmpSearch(e.target.value)}
+                      style={{
+                        width: '100%', padding: '4px 4px 4px 24px', borderRadius: 4,
+                        border: '1px solid #d1d5db', fontSize: 12, boxSizing: 'border-box',
+                      }} />
+                  </div>
+                  {employees
+                    .filter((e) => !activeConv.members?.some((m: any) => m.id === e.id))
+                    .filter((e) => !empSearch || e.name.toLowerCase().includes(empSearch.toLowerCase()))
+                    .slice(0, 5)
+                    .map((e: any) => (
+                      <div key={e.id} onClick={() => addMemberToGroup(e.id)}
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          padding: '4px 0', fontSize: 13, cursor: 'pointer',
+                        }}
+                        onMouseEnter={(ev) => ev.currentTarget.style.background = '#f1f5f9'}
+                        onMouseLeave={(ev) => ev.currentTarget.style.background = ''}>
+                        <span>{e.name}</span>
+                        <UserPlus size={14} color="#3b82f6" />
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
 
             {/* Nachrichten */}
             <div style={{ flex: 1, overflow: 'auto', padding: 20 }}>
@@ -421,7 +693,28 @@ export default function Chat({ userId }: Props) {
                           color: isMine ? '#dbeafe' : '#3b82f6',
                         }}>{m.sender_name}</div>
                       )}
-                      <div>{m.content}</div>
+                      {m.message_type === 'IMAGE' && m.file_path ? (
+                        <div>
+                          <img
+                            src={getChatFileUrl(m.file_path)}
+                            alt={m.content}
+                            style={{ maxWidth: '100%', borderRadius: 8, cursor: 'pointer', marginBottom: 4 }}
+                            onClick={() => window.open(getChatFileUrl(m.file_path), '_blank')}
+                          />
+                          <div style={{ fontSize: 12, opacity: 0.8 }}>{m.content}</div>
+                        </div>
+                      ) : m.message_type === 'FILE' && m.file_path ? (
+                        <a href={getChatFileUrl(m.file_path)} target="_blank" rel="noopener noreferrer"
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none',
+                            color: isMine ? '#fff' : '#3b82f6',
+                          }}>
+                          <Download size={16} />
+                          <span style={{ textDecoration: 'underline' }}>{m.content}</span>
+                        </a>
+                      ) : (
+                        <div>{m.content}</div>
+                      )}
                       <div style={{
                         fontSize: 10, marginTop: 4, textAlign: 'right',
                         color: isMine ? '#bfdbfe' : '#94a3b8',
@@ -435,11 +728,32 @@ export default function Chat({ userId }: Props) {
               <div ref={messagesEndRef} />
             </div>
 
+            {/* Upload-Fortschritt */}
+            {uploading && (
+              <div style={{ padding: '4px 20px', background: '#f0f9ff', borderTop: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: 12, color: '#3b82f6', marginBottom: 2 }}>Hochladen... {uploadProgress}%</div>
+                <div style={{ height: 3, background: '#e2e8f0', borderRadius: 2 }}>
+                  <div style={{ height: '100%', width: `${uploadProgress}%`, background: '#3b82f6', borderRadius: 2, transition: 'width 0.2s' }} />
+                </div>
+              </div>
+            )}
+
             {/* Eingabe */}
             <div style={{
               padding: '12px 20px', borderTop: '1px solid #e2e8f0', background: '#fff',
-              display: 'flex', gap: 8,
+              display: 'flex', gap: 8, alignItems: 'center',
             }}>
+              <input type="file" ref={fileInputRef} onChange={handleFileUpload}
+                style={{ display: 'none' }} />
+              <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
+                style={{
+                  width: 36, height: 36, borderRadius: '50%', border: 'none',
+                  background: '#f1f5f9', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+                title="Datei senden">
+                <Paperclip size={16} color="#64748b" />
+              </button>
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}

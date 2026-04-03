@@ -16,7 +16,7 @@ import Chat from './pages/Chat';
 import Tickets from './pages/Tickets';
 
 export default function App() {
-  const { user, loading, logout, isAdmin, isHR, isManager } = useAuth();
+  const { user, loading, logout, isHR, isManager } = useAuth();
 
   if (loading) {
     return (

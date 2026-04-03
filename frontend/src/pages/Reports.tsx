@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import Card, { Badge } from '../components/Card';
+import Card from '../components/Card';
 import {
   getYearlyOverview, getDepartmentSummary, getSurchargeSummary,
   getAbsenceStatistics, exportExtendedCsv,

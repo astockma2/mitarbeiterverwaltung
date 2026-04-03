@@ -37,6 +37,9 @@ async def lifespan(app: FastAPI):
     await create_tables()
     await seed_demo_data()
     await seed_bot_user()
+    # Firebase fuer Push-Notifications initialisieren (optional)
+    from app.services.push_notification import init_firebase
+    init_firebase()
     logging.getLogger(__name__).info("Anwendung gestartet")
     yield
     logging.getLogger(__name__).info("Anwendung beendet")
@@ -88,14 +91,14 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "ok", "version": "1.2.0"}
+    return {"status": "ok", "version": "1.3.1"}
 
 
 @app.get("/api/v1/app/version")
 async def app_version():
     """Aktuelle App-Version fuer Auto-Update-Check."""
     return {
-        "version": "1.2.0",
+        "version": "1.3.1",
         "download_url": "https://mva.c3po42.de/download/app-release.apk",
         "force_update": False,
     }

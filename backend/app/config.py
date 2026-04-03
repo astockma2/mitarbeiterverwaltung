@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     # KI-Support-Bot
     anthropic_api_key: str = ""
 
+    # Datei-Upload
+    upload_dir: str = "/app/uploads"
+    max_file_size_mb: int = 20
+
     # App
     app_name: str = "Mitarbeiterverwaltung"
     app_env: str = "development"

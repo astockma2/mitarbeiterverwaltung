@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/user.dart';
 import 'api_service.dart';
+import 'biometric_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   User? _user;
@@ -29,11 +30,27 @@ class AuthProvider extends ChangeNotifier {
   Future<void> login(String username, String password) async {
     await ApiService.login(username, password);
     _user = await ApiService.getMe();
+
+    // Credentials fuer Biometrie-Login speichern
+    if (await BiometricService.isAvailable()) {
+      await BiometricService.saveCredentials(username, password);
+    }
+
     notifyListeners();
+  }
+
+  Future<void> loginWithBiometric() async {
+    final credentials = await BiometricService.authenticate();
+    if (credentials == null) {
+      throw ApiException('Biometrie-Authentifizierung fehlgeschlagen', 0);
+    }
+    await login(credentials.username, credentials.password);
   }
 
   Future<void> logout() async {
     await ApiService.clearTokens();
+    // Biometrie-Credentials bewusst NICHT loeschen,
+    // damit der Fingerabdruck-Login nach Logout weiterhin funktioniert
     _user = null;
     notifyListeners();
   }

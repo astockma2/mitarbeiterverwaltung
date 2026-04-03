@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'services/auth_provider.dart';
+import 'services/push_notification_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('de_DE', null);
+  await PushNotificationService.initialize();
+  await PushNotificationService.requestPermission();
   runApp(
     ChangeNotifierProvider(
       create: (_) => AuthProvider()..init(),

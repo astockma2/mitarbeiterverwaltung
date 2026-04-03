@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Building2 } from 'lucide-react';
-import Card, { Badge } from '../components/Card';
+import Card from '../components/Card';
 import { getDepartments } from '../services/api';
 
 export default function Departments() {

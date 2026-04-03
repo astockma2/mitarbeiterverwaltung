@@ -2,8 +2,10 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../services/auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/biometric_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -15,6 +17,9 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? _monthly;
   late String _quote;
+  String _appVersion = '';
+  bool _biometricEnabled = false;
+  bool _biometricAvailable = false;
 
   static const _quotes = [
     // Motivation & Anfangen
@@ -112,6 +117,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final dayOfYear = DateTime.now().difference(DateTime(DateTime.now().year)).inDays;
     _quote = _quotes[dayOfYear % _quotes.length];
     _loadMonthly();
+    _loadAppVersion();
+    _loadBiometricStatus();
+  }
+
+  Future<void> _loadAppVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) setState(() => _appVersion = info.version);
+  }
+
+  Future<void> _loadBiometricStatus() async {
+    final available = await BiometricService.isAvailable();
+    final hasCredentials = await BiometricService.hasCredentials();
+    if (mounted) {
+      setState(() {
+        _biometricAvailable = available;
+        _biometricEnabled = available && hasCredentials;
+      });
+    }
   }
 
   Future<void> _loadMonthly() async {
@@ -290,11 +313,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const Divider(height: 1),
+                  if (_biometricAvailable)
+                    SwitchListTile(
+                      secondary: const Icon(Icons.fingerprint),
+                      title: const Text('Fingerabdruck-Login'),
+                      subtitle: Text(
+                        _biometricEnabled
+                            ? 'Aktiviert'
+                            : 'Einmal abmelden und mit Passwort anmelden um zu aktivieren',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      ),
+                      value: _biometricEnabled,
+                      onChanged: _biometricEnabled
+                          ? (val) async {
+                              if (!val) {
+                                await BiometricService.clearCredentials();
+                                _loadBiometricStatus();
+                              }
+                            }
+                          : null,
+                    ),
+                  if (_biometricAvailable) const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.info_outline),
                     title: const Text('App-Version'),
                     trailing: Text(
-                      '1.0.0',
+                      _appVersion.isNotEmpty ? _appVersion : '--',
                       style: TextStyle(color: Colors.grey.shade600),
                     ),
                   ),

@@ -2,19 +2,25 @@
 
 import asyncio
 import logging
+import os
+import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, WebSocket, WebSocketDisconnect, Query
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.auth.jwt import get_current_user
+from app.config import get_settings
 from app.database import async_session, get_db
 from app.models.employee import Employee
-from app.models.message import Conversation, ConversationMember, Message
+from app.models.message import Conversation, ConversationMember, DeviceToken, Message
+from app.services.push_notification import send_push_notification
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 log = logging.getLogger(__name__)
@@ -76,9 +82,20 @@ class ConversationCreate(BaseModel):
     name: Optional[str] = None
     member_ids: list[int]
 
+class ConversationUpdate(BaseModel):
+    name: str
+
+class MembersUpdate(BaseModel):
+    add: list[int] = []
+    remove: list[int] = []
+
 class MessageCreate(BaseModel):
     content: str
     message_type: str = "TEXT"
+
+class DeviceTokenCreate(BaseModel):
+    fcm_token: str
+    device_type: str = "android"
 
 
 # ── WebSocket-Endpoint ───────────────────────────────────────────
@@ -414,6 +431,164 @@ async def create_conversation(
     return {"id": conv.id, "existing": False}
 
 
+@router.put("/conversations/{conversation_id}")
+async def update_conversation(
+    conversation_id: int,
+    data: ConversationUpdate,
+    current_user: Employee = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Konversation umbenennen (nur Gruppen)."""
+    conv = await db.get(Conversation, conversation_id)
+    if not conv:
+        raise HTTPException(404, "Konversation nicht gefunden")
+    if conv.type == "DIRECT":
+        raise HTTPException(400, "Direktnachrichten koennen nicht umbenannt werden")
+
+    # Mitgliedschaft pruefen
+    member = await db.execute(
+        select(ConversationMember).where(
+            ConversationMember.conversation_id == conversation_id,
+            ConversationMember.employee_id == current_user.id,
+        )
+    )
+    if not member.scalar_one_or_none():
+        raise HTTPException(403, "Kein Mitglied dieser Konversation")
+
+    old_name = conv.name
+    conv.name = data.name.strip()
+
+    # System-Nachricht
+    sender_name = f"{current_user.first_name} {current_user.last_name}"
+    db.add(Message(
+        conversation_id=conversation_id,
+        sender_id=current_user.id,
+        content=f'{sender_name} hat die Gruppe in "{conv.name}" umbenannt',
+        message_type="SYSTEM",
+    ))
+
+    # Per WebSocket benachrichtigen
+    member_ids = await _get_member_ids(db, conversation_id)
+    await manager.send_to_conversation(member_ids, {
+        "type": "conversation_updated",
+        "conversation_id": conversation_id,
+        "name": conv.name,
+    })
+
+    return {"id": conversation_id, "name": conv.name}
+
+
+@router.put("/conversations/{conversation_id}/members")
+async def update_members(
+    conversation_id: int,
+    data: MembersUpdate,
+    current_user: Employee = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mitglieder einer Gruppe hinzufuegen oder entfernen."""
+    conv = await db.get(Conversation, conversation_id)
+    if not conv:
+        raise HTTPException(404, "Konversation nicht gefunden")
+    if conv.type == "DIRECT":
+        raise HTTPException(400, "Direktnachrichten koennen nicht geaendert werden")
+
+    # Mitgliedschaft pruefen
+    member = await db.execute(
+        select(ConversationMember).where(
+            ConversationMember.conversation_id == conversation_id,
+            ConversationMember.employee_id == current_user.id,
+        )
+    )
+    if not member.scalar_one_or_none():
+        raise HTTPException(403, "Kein Mitglied dieser Konversation")
+
+    sender_name = f"{current_user.first_name} {current_user.last_name}"
+
+    # Mitglieder hinzufuegen
+    added_names = []
+    for emp_id in data.add:
+        # Pruefen ob schon Mitglied
+        existing = await db.execute(
+            select(ConversationMember).where(
+                ConversationMember.conversation_id == conversation_id,
+                ConversationMember.employee_id == emp_id,
+            )
+        )
+        if existing.scalar_one_or_none():
+            continue
+        # Pruefen ob Employee existiert
+        emp = await db.get(Employee, emp_id)
+        if not emp or not emp.is_active:
+            continue
+        db.add(ConversationMember(
+            conversation_id=conversation_id,
+            employee_id=emp_id,
+        ))
+        added_names.append(f"{emp.first_name} {emp.last_name}")
+
+    # Mitglieder entfernen
+    removed_names = []
+    for emp_id in data.remove:
+        if emp_id == conv.created_by:
+            continue  # Ersteller kann nicht entfernt werden
+        existing = await db.execute(
+            select(ConversationMember).where(
+                ConversationMember.conversation_id == conversation_id,
+                ConversationMember.employee_id == emp_id,
+            )
+        )
+        member_to_remove = existing.scalar_one_or_none()
+        if member_to_remove:
+            emp = await db.get(Employee, emp_id)
+            if emp:
+                removed_names.append(f"{emp.first_name} {emp.last_name}")
+            await db.delete(member_to_remove)
+
+    # System-Nachrichten
+    if added_names:
+        db.add(Message(
+            conversation_id=conversation_id,
+            sender_id=current_user.id,
+            content=f'{sender_name} hat {", ".join(added_names)} hinzugefuegt',
+            message_type="SYSTEM",
+        ))
+    if removed_names:
+        db.add(Message(
+            conversation_id=conversation_id,
+            sender_id=current_user.id,
+            content=f'{sender_name} hat {", ".join(removed_names)} entfernt',
+            message_type="SYSTEM",
+        ))
+
+    await db.flush()
+
+    # Aktuelle Mitglieder laden
+    member_ids = await _get_member_ids(db, conversation_id)
+    members_q = await db.execute(
+        select(Employee).where(Employee.id.in_(member_ids))
+    )
+    members = members_q.scalars().all()
+
+    # Per WebSocket benachrichtigen (auch entfernte, damit UI aktualisiert)
+    all_affected = set(member_ids) | set(data.remove)
+    await manager.send_to_conversation(list(all_affected), {
+        "type": "members_updated",
+        "conversation_id": conversation_id,
+        "members": [
+            {"id": e.id, "name": f"{e.first_name} {e.last_name}"}
+            for e in members
+        ],
+    })
+
+    return {
+        "id": conversation_id,
+        "members": [
+            {"id": e.id, "name": f"{e.first_name} {e.last_name}"}
+            for e in members
+        ],
+    }
+
+
 @router.get("/conversations/{conversation_id}/messages")
 async def get_messages(
     conversation_id: int,
@@ -472,6 +647,7 @@ async def get_messages(
             "sender_name": sender_map.get(m.sender_id, ""),
             "content": m.content,
             "message_type": m.message_type,
+            "file_path": m.file_path,
             "created_at": m.created_at.isoformat() + "Z",
             "edited_at": m.edited_at.isoformat() if m.edited_at else None,
         }
@@ -591,6 +767,184 @@ async def get_online_users(
     return {"online_users": manager.get_online_users()}
 
 
+# ── Device-Token (Push-Notifications) ───────────────────────────
+
+@router.post("/register-device")
+async def register_device(
+    data: DeviceTokenCreate,
+    current_user: Employee = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """FCM Device-Token registrieren."""
+    # Pruefen ob Token schon existiert
+    existing = await db.execute(
+        select(DeviceToken).where(DeviceToken.fcm_token == data.fcm_token)
+    )
+    token = existing.scalar_one_or_none()
+    if token:
+        # Token existiert, ggf. Employee aktualisieren
+        token.employee_id = current_user.id
+    else:
+        db.add(DeviceToken(
+            employee_id=current_user.id,
+            fcm_token=data.fcm_token,
+            device_type=data.device_type,
+        ))
+    return {"status": "registered"}
+
+
+@router.delete("/unregister-device")
+async def unregister_device(
+    data: DeviceTokenCreate,
+    current_user: Employee = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """FCM Device-Token entfernen."""
+    result = await db.execute(
+        select(DeviceToken).where(
+            DeviceToken.fcm_token == data.fcm_token,
+            DeviceToken.employee_id == current_user.id,
+        )
+    )
+    token = result.scalar_one_or_none()
+    if token:
+        await db.delete(token)
+    return {"status": "unregistered"}
+
+
+# ── Datei-Upload und -Download ──────────────────────────────────
+
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
+
+
+@router.post("/conversations/{conversation_id}/upload")
+async def upload_file(
+    conversation_id: int,
+    file: UploadFile,
+    current_user: Employee = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Datei in eine Konversation hochladen."""
+    settings = get_settings()
+
+    # Mitgliedschaft pruefen
+    member = await db.execute(
+        select(ConversationMember).where(
+            ConversationMember.conversation_id == conversation_id,
+            ConversationMember.employee_id == current_user.id,
+        )
+    )
+    if not member.scalar_one_or_none():
+        raise HTTPException(403, "Kein Mitglied dieser Konversation")
+
+    # Dateigroesse pruefen
+    content = await file.read()
+    max_size = settings.max_file_size_mb * 1024 * 1024
+    if len(content) > max_size:
+        raise HTTPException(413, f"Datei zu gross (max {settings.max_file_size_mb} MB)")
+
+    # Datei speichern
+    file_ext = Path(file.filename).suffix.lower() if file.filename else ""
+    unique_name = f"{uuid.uuid4().hex}{file_ext}"
+    upload_dir = Path(settings.upload_dir) / "chat" / str(conversation_id)
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    file_path = upload_dir / unique_name
+
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    # Message-Typ bestimmen
+    message_type = "IMAGE" if file_ext in IMAGE_EXTENSIONS else "FILE"
+    stored_path = f"chat/{conversation_id}/{unique_name}"
+
+    # Nachricht erstellen
+    msg = Message(
+        conversation_id=conversation_id,
+        sender_id=current_user.id,
+        content=file.filename or unique_name,
+        message_type=message_type,
+        file_path=stored_path,
+    )
+    db.add(msg)
+    await db.flush()
+
+    sender_name = f"{current_user.first_name} {current_user.last_name}"
+
+    response = {
+        "id": msg.id,
+        "conversation_id": conversation_id,
+        "sender_id": current_user.id,
+        "sender_name": sender_name,
+        "content": msg.content,
+        "message_type": message_type,
+        "file_path": stored_path,
+        "created_at": msg.created_at.isoformat() + "Z",
+    }
+
+    # Per WebSocket an alle Mitglieder senden
+    member_ids = await _get_member_ids(db, conversation_id)
+    await manager.send_to_conversation(member_ids, {
+        "type": "new_message",
+        **response,
+    })
+
+    # Push-Notification an Offline-User
+    online_users = manager.get_online_users()
+    try:
+        await send_push_notification(
+            db,
+            recipient_ids=[m for m in member_ids if m != current_user.id],
+            sender_name=sender_name,
+            message_content=msg.content,
+            conversation_id=conversation_id,
+            message_type=message_type,
+            exclude_online=online_users,
+        )
+    except Exception as e:
+        log.warning("Push-Notification fehlgeschlagen: %s", e)
+
+    return response
+
+
+@router.get("/files/{file_path:path}")
+async def download_file(
+    file_path: str,
+    current_user: Employee = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Datei herunterladen (mit Mitgliedschaftspruefung)."""
+    settings = get_settings()
+
+    # conversation_id aus dem Pfad extrahieren (chat/{conv_id}/filename)
+    parts = file_path.split("/")
+    if len(parts) < 3 or parts[0] != "chat":
+        raise HTTPException(400, "Ungueltiger Dateipfad")
+
+    try:
+        conversation_id = int(parts[1])
+    except ValueError:
+        raise HTTPException(400, "Ungueltiger Dateipfad")
+
+    # Mitgliedschaft pruefen
+    member = await db.execute(
+        select(ConversationMember).where(
+            ConversationMember.conversation_id == conversation_id,
+            ConversationMember.employee_id == current_user.id,
+        )
+    )
+    if not member.scalar_one_or_none():
+        raise HTTPException(403, "Kein Zugriff auf diese Datei")
+
+    full_path = Path(settings.upload_dir) / file_path
+    if not full_path.exists() or not full_path.is_file():
+        raise HTTPException(404, "Datei nicht gefunden")
+
+    return FileResponse(
+        path=str(full_path),
+        filename=parts[-1] if len(parts) > 2 else "download",
+    )
+
+
 # ── Hilfsfunktionen ──────────────────────────────────────────────
 
 async def _get_member_ids(db: AsyncSession, conversation_id: int) -> list[int]:
@@ -647,7 +1001,7 @@ async def _create_message(
     sender = sender_q.scalar_one_or_none()
     sender_name = f"{sender.first_name} {sender.last_name}" if sender else ""
 
-    return {
+    result = {
         "type": "new_message",
         "id": msg.id,
         "conversation_id": conversation_id,
@@ -657,3 +1011,21 @@ async def _create_message(
         "message_type": msg.message_type,
         "created_at": msg.created_at.isoformat() + "Z",
     }
+
+    # Push-Notification an Offline-User
+    member_ids = await _get_member_ids(db, conversation_id)
+    online_users = manager.get_online_users()
+    try:
+        await send_push_notification(
+            db,
+            recipient_ids=[m for m in member_ids if m != sender_id],
+            sender_name=sender_name,
+            message_content=content,
+            conversation_id=conversation_id,
+            message_type="TEXT",
+            exclude_online=online_users,
+        )
+    except Exception as e:
+        log.warning("Push-Notification fehlgeschlagen: %s", e)
+
+    return result

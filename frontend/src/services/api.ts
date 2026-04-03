@@ -120,6 +120,21 @@ export const getMessages = (conversationId: number, before?: string) =>
 export const sendMessage = (conversationId: number, content: string) =>
   api.post(`/chat/conversations/${conversationId}/messages`, { content });
 export const getChatEmployees = () => api.get('/chat/employees');
+export const updateConversation = (conversationId: number, data: { name: string }) =>
+  api.put(`/chat/conversations/${conversationId}`, data);
+export const updateMembers = (conversationId: number, data: { add?: number[]; remove?: number[] }) =>
+  api.put(`/chat/conversations/${conversationId}/members`, data);
+export const uploadChatFile = (conversationId: number, file: File, onProgress?: (pct: number) => void) =>
+  api.post(`/chat/conversations/${conversationId}/upload`, (() => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return fd;
+  })(), {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: onProgress ? (e: any) => onProgress(Math.round((e.loaded * 100) / e.total)) : undefined,
+  });
+export const getChatFileUrl = (filePath: string) =>
+  `${api.defaults.baseURL}/chat/files/${filePath}`;
 
 // Tickets
 export const getTickets = (params?: Record<string, any>) =>

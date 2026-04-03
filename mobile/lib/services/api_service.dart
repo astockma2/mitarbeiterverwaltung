@@ -20,8 +20,11 @@ class ApiService {
 
   // --- Token-Verwaltung ---
 
+  static String? currentToken;
+
   static Future<String?> getToken() async {
-    return await _storage.read(key: 'access_token');
+    currentToken = await _storage.read(key: 'access_token');
+    return currentToken;
   }
 
   static Future<void> saveTokens(String access, String refresh) async {
@@ -67,6 +70,25 @@ class ApiService {
         uri,
         headers: headers,
         body: body != null ? jsonEncode(body) : null,
+      );
+      return _handleResponse(response);
+    } on ApiException {
+      rethrow;
+    } on SocketException {
+      throw ApiException('Server nicht erreichbar', 0);
+    } on TimeoutException {
+      throw ApiException('Zeitüberschreitung – bitte erneut versuchen', 0);
+    }
+  }
+
+  static Future<dynamic> _put(String path, Map<String, dynamic> body) async {
+    try {
+      final uri = Uri.parse('$baseUrl$path');
+      final headers = await _authHeaders();
+      final response = await http.put(
+        uri,
+        headers: headers,
+        body: jsonEncode(body),
       );
       return _handleResponse(response);
     } on ApiException {
@@ -223,6 +245,46 @@ class ApiService {
   static Future<List<ChatEmployee>> getChatEmployees() async {
     final data = await _get('/chat/employees');
     return (data as List).map((e) => ChatEmployee.fromJson(e)).toList();
+  }
+
+  static Future<Map<String, dynamic>> updateConversation(int conversationId, {required String name}) async {
+    return await _put('/chat/conversations/$conversationId', {'name': name});
+  }
+
+  static Future<Map<String, dynamic>> updateMembers(int conversationId, {List<int> add = const [], List<int> remove = const []}) async {
+    return await _put('/chat/conversations/$conversationId/members', {'add': add, 'remove': remove});
+  }
+
+  static Future<ChatMessage> uploadChatFile(int conversationId, String filePath, String fileName) async {
+    final uri = Uri.parse('$baseUrl/chat/conversations/$conversationId/upload');
+    final headers = await _authHeaders();
+    final request = http.MultipartRequest('POST', uri);
+    request.headers.addAll(headers);
+    request.files.add(await http.MultipartFile.fromPath('file', filePath, filename: fileName));
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+    final data = _handleResponse(response);
+    return ChatMessage.fromJson(data);
+  }
+
+  static String getChatFileUrl(String filePath) {
+    return '$baseUrl/chat/files/$filePath';
+  }
+
+  static Future<Map<String, String>> getAuthHeaders() async {
+    return _authHeaders();
+  }
+
+  static Future<void> registerDeviceToken(String fcmToken, {String deviceType = 'android'}) async {
+    await _post('/chat/register-device', body: {'fcm_token': fcmToken, 'device_type': deviceType});
+  }
+
+  static Future<void> unregisterDeviceToken(String fcmToken) async {
+    // DELETE mit Body via custom request
+    final uri = Uri.parse('$baseUrl/chat/unregister-device');
+    final headers = await _authHeaders();
+    final response = await http.delete(uri, headers: headers, body: jsonEncode({'fcm_token': fcmToken}));
+    _handleResponse(response);
   }
 
   static Future<int?> getSupportBotId() async {

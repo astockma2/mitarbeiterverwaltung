@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Clock, LogIn, LogOut, Plus } from 'lucide-react';
+import { LogIn, LogOut } from 'lucide-react';
 import Card, { Badge } from '../components/Card';
 import { clockIn, clockOut, getClockStatus, getTimeEntries, getDailySummary } from '../services/api';
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CalendarDays, Check, X } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import Card, { Badge } from '../components/Card';
 import { getAbsences, createAbsence, getPendingAbsences, reviewAbsence, getVacationBalance } from '../services/api';
 

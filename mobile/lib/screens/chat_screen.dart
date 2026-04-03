@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../services/auth_provider.dart';
 import '../models/chat.dart';
@@ -77,21 +79,43 @@ class _ChatListScreenState extends State<ChatListScreen> {
     if (!mounted) return;
     showModalBottomSheet(
       context: context,
-      builder: (ctx) => _NewChatSheet(
-        employees: employees,
-        onSelect: (empId) async {
-          Navigator.pop(ctx);
-          final result = await ApiService.createConversation(
-            type: 'DIRECT',
-            memberIds: [empId],
-          );
-          await _load();
-          final conv = _conversations.firstWhere(
-            (c) => c.id == result['id'],
-            orElse: () => _conversations.first,
-          );
-          _openConversation(conv);
-        },
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        maxChildSize: 0.9,
+        minChildSize: 0.4,
+        expand: false,
+        builder: (_, scrollController) => _NewChatSheet(
+          employees: employees,
+          scrollController: scrollController,
+          onSelectDirect: (empId) async {
+            Navigator.pop(ctx);
+            final result = await ApiService.createConversation(
+              type: 'DIRECT',
+              memberIds: [empId],
+            );
+            await _load();
+            final conv = _conversations.firstWhere(
+              (c) => c.id == result['id'],
+              orElse: () => _conversations.first,
+            );
+            _openConversation(conv);
+          },
+          onCreateGroup: (name, memberIds) async {
+            Navigator.pop(ctx);
+            final result = await ApiService.createConversation(
+              type: 'GROUP',
+              memberIds: memberIds,
+              name: name,
+            );
+            await _load();
+            final conv = _conversations.firstWhere(
+              (c) => c.id == result['id'],
+              orElse: () => _conversations.first,
+            );
+            _openConversation(conv);
+          },
+        ),
       ),
     );
   }
@@ -182,9 +206,13 @@ class _ConversationTile extends StatelessWidget {
       onTap: onTap,
       tileColor: isBot ? Colors.green.shade50 : null,
       leading: CircleAvatar(
-        backgroundColor: isBot ? Colors.green.shade100 : Colors.blue.shade100,
+        backgroundColor: isBot ? Colors.green.shade100
+            : conversation.type == 'GROUP' ? Colors.indigo.shade100
+            : Colors.blue.shade100,
         child: isBot
             ? Icon(Icons.smart_toy, size: 20, color: Colors.green.shade700)
+            : conversation.type == 'GROUP'
+            ? Icon(Icons.group, size: 20, color: Colors.indigo.shade700)
             : Text(
                 initials,
                 style: TextStyle(
@@ -261,17 +289,40 @@ class _ConversationTile extends StatelessWidget {
 
 class _NewChatSheet extends StatefulWidget {
   final List<ChatEmployee> employees;
-  final Function(int) onSelect;
+  final ScrollController scrollController;
+  final Function(int) onSelectDirect;
+  final Function(String name, List<int> memberIds) onCreateGroup;
 
-  const _NewChatSheet({required this.employees, required this.onSelect});
+  const _NewChatSheet({
+    required this.employees,
+    required this.scrollController,
+    required this.onSelectDirect,
+    required this.onCreateGroup,
+  });
 
   @override
   State<_NewChatSheet> createState() => _NewChatSheetState();
 }
 
-class _NewChatSheetState extends State<_NewChatSheet> {
+class _NewChatSheetState extends State<_NewChatSheet> with SingleTickerProviderStateMixin {
   String _search = '';
   final Set<String> _collapsedDepts = {};
+  late TabController _tabController;
+  final _groupNameController = TextEditingController();
+  final Set<int> _selectedMembers = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _groupNameController.dispose();
+    super.dispose();
+  }
 
   List<ChatEmployee> get _filtered {
     if (_search.isEmpty) return widget.employees;
@@ -291,11 +342,89 @@ class _NewChatSheetState extends State<_NewChatSheet> {
     );
   }
 
+  Widget _buildEmployeeList({required bool isGroupMode}) {
+    final groups = _grouped;
+    if (groups.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text('Kein Mitarbeiter gefunden.',
+              style: TextStyle(color: Colors.grey.shade400)),
+        ),
+      );
+    }
+    return ListView(
+      controller: widget.scrollController,
+      children: groups.entries.expand((entry) {
+        final dept = entry.key;
+        final emps = entry.value;
+        final collapsed = _collapsedDepts.contains(dept);
+        return [
+          InkWell(
+            onTap: () => setState(() {
+              collapsed ? _collapsedDepts.remove(dept) : _collapsedDepts.add(dept);
+            }),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: Colors.grey.shade100,
+              child: Row(
+                children: [
+                  Icon(
+                    collapsed ? Icons.chevron_right : Icons.expand_more,
+                    size: 18, color: Colors.grey.shade600,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '$dept (${emps.length})',
+                    style: TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (!collapsed)
+            ...emps.map((emp) => ListTile(
+                  leading: isGroupMode
+                      ? Checkbox(
+                          value: _selectedMembers.contains(emp.id),
+                          onChanged: (_) => setState(() {
+                            _selectedMembers.contains(emp.id)
+                                ? _selectedMembers.remove(emp.id)
+                                : _selectedMembers.add(emp.id);
+                          }),
+                        )
+                      : CircleAvatar(
+                          backgroundColor: Colors.blue.shade50,
+                          radius: 18,
+                          child: Text(
+                            emp.name.split(' ').take(2).map((w) => w[0]).join().toUpperCase(),
+                            style: TextStyle(color: Colors.blue.shade700, fontSize: 12),
+                          ),
+                        ),
+                  title: Text(emp.name, style: const TextStyle(fontSize: 14)),
+                  trailing: emp.online
+                      ? const Icon(Icons.circle, size: 10, color: Colors.green)
+                      : null,
+                  dense: true,
+                  onTap: isGroupMode
+                      ? () => setState(() {
+                          _selectedMembers.contains(emp.id)
+                              ? _selectedMembers.remove(emp.id)
+                              : _selectedMembers.add(emp.id);
+                        })
+                      : () => widget.onSelectDirect(emp.id),
+                )),
+        ];
+      }).toList(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final groups = _grouped;
     return Column(
-      mainAxisSize: MainAxisSize.min,
       children: [
         Padding(
           padding: const EdgeInsets.all(16),
@@ -304,9 +433,19 @@ class _NewChatSheetState extends State<_NewChatSheet> {
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
         ),
+        TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'Direktnachricht'),
+            Tab(icon: Icon(Icons.group, size: 18), text: 'Gruppe'),
+          ],
+          labelColor: Theme.of(context).colorScheme.primary,
+          unselectedLabelColor: Colors.grey,
+          indicatorSize: TabBarIndicatorSize.tab,
+        ),
         // Suchfeld
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.all(12),
           child: TextField(
             autofocus: true,
             decoration: InputDecoration(
@@ -319,70 +458,61 @@ class _NewChatSheetState extends State<_NewChatSheet> {
             onChanged: (v) => setState(() => _search = v),
           ),
         ),
-        const SizedBox(height: 8),
-        Flexible(
-          child: groups.isEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text('Kein Mitarbeiter gefunden.',
-                        style: TextStyle(color: Colors.grey.shade400)),
-                  ),
-                )
-              : ListView(
-                  shrinkWrap: true,
-                  children: groups.entries.expand((entry) {
-                    final dept = entry.key;
-                    final emps = entry.value;
-                    final collapsed = _collapsedDepts.contains(dept);
-                    return [
-                      // Abteilungs-Header
-                      InkWell(
-                        onTap: () => setState(() {
-                          collapsed ? _collapsedDepts.remove(dept) : _collapsedDepts.add(dept);
-                        }),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          color: Colors.grey.shade100,
-                          child: Row(
-                            children: [
-                              Icon(
-                                collapsed ? Icons.chevron_right : Icons.expand_more,
-                                size: 18, color: Colors.grey.shade600,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '$dept (${emps.length})',
-                                style: TextStyle(
-                                  fontSize: 12, fontWeight: FontWeight.w600,
-                                  color: Colors.grey.shade700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              // Tab 1: Direktnachricht
+              _buildEmployeeList(isGroupMode: false),
+              // Tab 2: Gruppe
+              Column(
+                children: [
+                  // Gruppenname
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: TextField(
+                      controller: _groupNameController,
+                      decoration: InputDecoration(
+                        hintText: 'Gruppenname...',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        isDense: true,
                       ),
-                      // Mitarbeiter
-                      if (!collapsed)
-                        ...emps.map((emp) => ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: Colors.blue.shade50,
-                                radius: 18,
-                                child: Text(
-                                  emp.name.split(' ').take(2).map((w) => w[0]).join().toUpperCase(),
-                                  style: TextStyle(color: Colors.blue.shade700, fontSize: 12),
-                                ),
-                              ),
-                              title: Text(emp.name, style: const TextStyle(fontSize: 14)),
-                              trailing: emp.online
-                                  ? const Icon(Icons.circle, size: 10, color: Colors.green)
-                                  : null,
-                              dense: true,
-                              onTap: () => widget.onSelect(emp.id),
-                            )),
-                    ];
-                  }).toList(),
-                ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                  if (_selectedMembers.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      child: Row(
+                        children: [
+                          Text(
+                            '${_selectedMembers.length} Mitglied${_selectedMembers.length != 1 ? "er" : ""} ausgewaehlt',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                          ),
+                          const Spacer(),
+                          ElevatedButton.icon(
+                            onPressed: _groupNameController.text.trim().isNotEmpty && _selectedMembers.isNotEmpty
+                                ? () => widget.onCreateGroup(
+                                    _groupNameController.text.trim(),
+                                    _selectedMembers.toList(),
+                                  )
+                                : null,
+                            icon: const Icon(Icons.check, size: 18),
+                            label: const Text('Erstellen'),
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              textStyle: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  Expanded(child: _buildEmployeeList(isGroupMode: true)),
+                ],
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -410,6 +540,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _speechAvailable = false;
   bool _isListening = false;
+  bool _uploading = false;
 
   // Polling
   Timer? _pollTimer;
@@ -481,6 +612,81 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
   }
 
+  void _showMembersDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Mitglieder (${widget.conversation.members.length})'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: widget.conversation.members.length,
+            itemBuilder: (_, i) {
+              final m = widget.conversation.members[i];
+              return ListTile(
+                dense: true,
+                leading: CircleAvatar(
+                  radius: 16,
+                  backgroundColor: Colors.blue.shade50,
+                  child: Text(
+                    m.name.split(' ').take(2).map((w) => w.isNotEmpty ? w[0] : '').join().toUpperCase(),
+                    style: TextStyle(fontSize: 11, color: Colors.blue.shade700),
+                  ),
+                ),
+                title: Text(m.name, style: const TextStyle(fontSize: 14)),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Schliessen'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickAndUploadFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.any,
+      allowMultiple: false,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    if (file.path == null) return;
+
+    if (file.size > 20 * 1024 * 1024) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Datei zu gross (max 20 MB)'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
+    setState(() => _uploading = true);
+    try {
+      final msg = await ApiService.uploadChatFile(
+        widget.conversation.id,
+        file.path!,
+        file.name,
+      );
+      setState(() {
+        _messages.add(msg);
+        _uploading = false;
+      });
+      _scrollToBottom();
+    } catch (e) {
+      setState(() => _uploading = false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Fehler beim Hochladen'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   Future<void> _loadMessages() async {
     setState(() => _loading = true);
     try {
@@ -533,7 +739,26 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.conversation.name),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.conversation.name),
+            if (widget.conversation.type == 'GROUP')
+              Text(
+                '${widget.conversation.members.length} Mitglieder',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: Colors.grey.shade400),
+              ),
+          ],
+        ),
+        actions: widget.conversation.type != 'DIRECT'
+            ? [
+                IconButton(
+                  icon: const Icon(Icons.group),
+                  tooltip: 'Mitglieder',
+                  onPressed: () => _showMembersDialog(),
+                ),
+              ]
+            : null,
       ),
       body: Column(
         children: [
@@ -613,6 +838,50 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                                         color: Colors.blue.shade700,
                                       ),
                                     ),
+                                  if (msg.messageType == 'IMAGE' && msg.filePath != null) ...[
+                                    GestureDetector(
+                                      onTap: () => launchUrl(Uri.parse(ApiService.getChatFileUrl(msg.filePath!))),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.network(
+                                          ApiService.getChatFileUrl(msg.filePath!),
+                                          headers: {'Authorization': 'Bearer ${ApiService.currentToken}'},
+                                          width: double.infinity,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 48),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      msg.content,
+                                      style: TextStyle(
+                                        color: isMine ? Colors.white70 : Colors.grey,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ] else if (msg.messageType == 'FILE' && msg.filePath != null) ...[
+                                    GestureDetector(
+                                      onTap: () => launchUrl(Uri.parse(ApiService.getChatFileUrl(msg.filePath!))),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.file_present, size: 20, color: isMine ? Colors.white : Colors.blue),
+                                          const SizedBox(width: 6),
+                                          Flexible(
+                                            child: Text(
+                                              msg.content,
+                                              style: TextStyle(
+                                                color: isMine ? Colors.white : Colors.blue,
+                                                fontSize: 14,
+                                                decoration: TextDecoration.underline,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ] else
                                   Text(
                                     msg.content,
                                     style: TextStyle(
@@ -670,6 +939,25 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             ),
             child: Row(
               children: [
+                // Attachment-Button
+                GestureDetector(
+                  onTap: _uploading ? null : _pickAndUploadFile,
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.grey.shade100,
+                    ),
+                    child: _uploading
+                        ? const Padding(
+                            padding: EdgeInsets.all(10),
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(Icons.attach_file, size: 22, color: Colors.grey.shade600),
+                  ),
+                ),
+                const SizedBox(width: 4),
                 // Mikrofon-Button
                 GestureDetector(
                   onTap: _toggleListening,

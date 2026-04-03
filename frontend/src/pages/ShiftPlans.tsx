@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Plus, Calendar, CheckCircle, Eraser, MousePointer, Settings, Pencil, Trash2 } from 'lucide-react';
 import Card, { Badge } from '../components/Card';
 import {

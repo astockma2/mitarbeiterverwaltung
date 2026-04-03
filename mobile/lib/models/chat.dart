@@ -70,6 +70,7 @@ class ChatMessage {
   final String senderName;
   final String content;
   final String messageType;
+  final String? filePath;
   final String createdAt;
 
   ChatMessage({
@@ -79,6 +80,7 @@ class ChatMessage {
     required this.senderName,
     required this.content,
     required this.messageType,
+    this.filePath,
     required this.createdAt,
   });
 
@@ -90,6 +92,7 @@ class ChatMessage {
       senderName: json['sender_name'] ?? '',
       content: json['content'] ?? '',
       messageType: json['message_type'] ?? 'TEXT',
+      filePath: json['file_path'],
       createdAt: json['created_at'] ?? '',
     );
   }

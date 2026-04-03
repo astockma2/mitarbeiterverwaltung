@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/biometric_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -15,6 +16,21 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _loading = false;
   String? _error;
+  bool _biometricAvailable = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBiometric();
+  }
+
+  Future<void> _checkBiometric() async {
+    final available = await BiometricService.isAvailable();
+    final hasCredentials = await BiometricService.hasCredentials();
+    if (mounted) {
+      setState(() => _biometricAvailable = available && hasCredentials);
+    }
+  }
 
   Future<void> _login() async {
     setState(() {
@@ -31,7 +47,22 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       setState(() => _error = 'Verbindungsfehler. Server erreichbar?');
     }
-    setState(() => _loading = false);
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _loginWithBiometric() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await context.read<AuthProvider>().loginWithBiometric();
+    } on ApiException catch (e) {
+      setState(() => _error = e.message);
+    } catch (e) {
+      setState(() => _error = 'Biometrie-Login fehlgeschlagen');
+    }
+    if (mounted) setState(() => _loading = false);
   }
 
   @override
@@ -135,32 +166,34 @@ class _LoginScreenState extends State<LoginScreen> {
                         : const Text('Anmelden', style: TextStyle(fontSize: 16)),
                   ),
                 ),
-                const SizedBox(height: 16),
 
-                // Dev-Hinweis
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
+                // Fingerabdruck-Button
+                if (_biometricAvailable) ...[
+                  const SizedBox(height: 16),
+                  const Row(
                     children: [
-                      Icon(Icons.info_outline, color: Colors.blue.shade700, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Dev-Modus: Passwort "dev" fuer alle Benutzer',
-                          style: TextStyle(
-                            color: Colors.blue.shade700,
-                            fontSize: 12,
-                          ),
-                        ),
+                      Expanded(child: Divider()),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        child: Text('oder', style: TextStyle(color: Colors.grey)),
                       ),
+                      Expanded(child: Divider()),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: OutlinedButton.icon(
+                      onPressed: _loading ? null : _loginWithBiometric,
+                      icon: const Icon(Icons.fingerprint, size: 24),
+                      label: const Text('Mit Fingerabdruck anmelden',
+                          style: TextStyle(fontSize: 16)),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 32),
+
                 Text(
                   'Powered by IKK IT',
                   style: TextStyle(

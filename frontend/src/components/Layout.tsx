@@ -1,7 +1,7 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import {
   Users, Clock, Calendar, BarChart3, Building2, LogOut,
-  ClipboardList, CalendarDays, Home, MessageCircle, Lock, FileSpreadsheet, TicketCheck
+  ClipboardList, CalendarDays, Home, MessageCircle, Lock, TicketCheck
 } from 'lucide-react';
 
 interface LayoutProps {
