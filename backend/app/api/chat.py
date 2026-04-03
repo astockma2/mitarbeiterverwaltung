@@ -402,6 +402,12 @@ async def create_conversation(
             if member_ids_existing == {current_user.id, other_id}:
                 return {"id": conv.id, "existing": True}
 
+    # Mitglieder validieren
+    for mid in data.member_ids:
+        emp = await db.get(Employee, mid)
+        if not emp or not emp.is_active:
+            raise HTTPException(status_code=422, detail=f"Mitarbeiter {mid} nicht gefunden oder inaktiv")
+
     conv = Conversation(
         type=data.type,
         name=data.name,
@@ -782,8 +788,13 @@ async def register_device(
     )
     token = existing.scalar_one_or_none()
     if token:
-        # Token existiert, ggf. Employee aktualisieren
-        token.employee_id = current_user.id
+        if token.employee_id != current_user.id:
+            raise HTTPException(
+                status_code=403,
+                detail="Token gehört einem anderen Benutzer",
+            )
+        # device_type aktualisieren falls nötig
+        token.device_type = data.device_type
     else:
         db.add(DeviceToken(
             employee_id=current_user.id,
