@@ -12,7 +12,7 @@
 2. [Zeiterfassung](#2-zeiterfassung)
 3. [Abwesenheiten](#3-abwesenheiten)
 4. [Dienstplan](#4-dienstplan)
-5. [Nachrichten / Chat](#5-nachrichten--chat)
+5. [Nachrichten / Chat](#5-nachrichten--chat) (inkl. Gruppenchat und Support-Bot)
 6. [Für Abteilungsleiter](#6-für-abteilungsleiter)
 7. [Für HR und Administration](#7-für-hr-und-administration)
 
@@ -166,13 +166,16 @@ Ihr Urlaubskonto wird oben auf der Seite „Abwesenheiten" immer aktuell angezei
 
 > **Hinweis:** Die Krankmeldung dient der Dokumentation im System. Die ärztliche Bescheinigung geben Sie bitte weiterhin wie gewohnt in der Personalabteilung ab.
 
-### 3.4 Fortbildung oder Sonderurlaub beantragen
+### 3.4 Fortbildung, Sonderurlaub oder Freizeitausgleich beantragen
 
 Das Verfahren ist dasselbe wie beim Urlaubsantrag:
 
 1. **„Neuer Antrag"** klicken.
-2. Als Typ **„Fortbildung"** oder **„Sonderurlaub"** wählen.
-3. Datum eingeben und ggf. eine Anmerkung hinzufügen (z. B. Name der Fortbildung).
+2. Als Typ wählen:
+   - **„Fortbildung"** — für Schulungen oder externe Weiterbildungen (ggf. Name der Veranstaltung in das Anmerkungsfeld eintragen).
+   - **„Sonderurlaub"** — für besondere Ereignisse wie Umzug, Trauerfälle oder Hochzeit.
+   - **„Freizeitausgleich"** — wenn Sie Überstunden als freie Tage nehmen möchten.
+3. Datum eingeben und ggf. eine Anmerkung hinzufügen.
 4. **„Absenden"** klicken.
 
 ### 3.5 Status eines Antrags prüfen
@@ -239,10 +242,11 @@ Wenn Sie bei einer freien Schicht einspringen können, wenden Sie sich direkt an
 1. Klicken Sie in der Seitenleiste auf **„Nachrichten"**.
 2. Links sehen Sie die Liste Ihrer vorhandenen Gespräche.
 3. Um ein neues Gespräch zu starten, klicken Sie auf den blauen **„+"-Button** oben rechts in der Nachrichtenliste.
-4. Eine Mitarbeiterliste erscheint. Suchen Sie nach dem Namen (Suchfeld oben).
-5. Klicken Sie auf den gewünschten Mitarbeiter.
-6. Das Chatfenster öffnet sich rechts.
-7. Schreiben Sie Ihre Nachricht in das Textfeld unten und drücken Sie **Enter** oder klicken Sie auf den blauen **Senden-Button** (Pfeil).
+4. Im Dialog wählen Sie den Reiter **„Einzelchat"**.
+5. Eine Mitarbeiterliste erscheint — nach Abteilungen gruppiert. Suchen Sie über das Suchfeld nach dem Namen.
+6. Klicken Sie auf den gewünschten Mitarbeiter.
+7. Das Chatfenster öffnet sich rechts.
+8. Schreiben Sie Ihre Nachricht in das Textfeld unten und drücken Sie **Enter** oder klicken Sie auf den blauen **Senden-Button** (Pfeil-Symbol).
 
 [Screenshot: Chat-Ansicht mit geöffnetem Gespräch und Texteingabe]
 
@@ -254,17 +258,38 @@ Klicken Sie auf ein Gespräch, um es zu öffnen.
 
 ### 5.3 Mitarbeiter nach Abteilung suchen
 
-Beim Starten eines neuen Chats (Schritt 3–4 oben) sind die Mitarbeiter nach **Abteilungen** gruppiert. Klicken Sie auf den Abteilungsnamen, um die Liste auf- oder zuzuklappen.
+Beim Starten eines neuen Chats sind die Mitarbeiter nach **Abteilungen** gruppiert. Klicken Sie auf den Abteilungsnamen, um die Liste auf- oder zuzuklappen.
 
 Ein grüner Punkt neben dem Namen bedeutet: Der Mitarbeiter ist gerade online.
 
 [Screenshot: Mitarbeiterliste nach Abteilungen gruppiert]
 
-### 5.4 Gruppenchat / Abteilungs-Chat
+### 5.4 Gruppenchat erstellen
 
-Bestehende Gruppengespräche (z. B. der Abteilungs-Chat) erscheinen ebenfalls in Ihrer Gesprächsliste. Klicken Sie darauf, um am Gespräch teilzunehmen.
+Sie können selbst einen Gruppenchat für mehrere Personen einrichten:
 
-> **Hinweis:** Neue Gruppenkonversationen werden derzeit von der Abteilungsleitung oder der IT eingerichtet.
+1. Klicken Sie auf den **„+"-Button** oben rechts in der Gesprächsliste.
+2. Wählen Sie im Dialog den Reiter **„Gruppenchat"**.
+3. Geben Sie einen **Gruppenname** ein (z. B. „Frühdienst Team A").
+4. Wählen Sie alle gewünschten Mitglieder aus der Mitarbeiterliste aus (Häkchen setzen).
+5. Klicken Sie auf **„Erstellen"**.
+
+Der neue Gruppenchat erscheint sofort in Ihrer Gesprächsliste. Alle hinzugefügten Mitglieder können die Nachrichten sehen und antworten.
+
+[Screenshot: Neuer-Chat-Dialog im Modus „Gruppenchat"]
+
+### 5.5 Abteilungs-Chat und bestehende Gruppen
+
+Bereits vorhandene Gruppenkonversationen (z. B. ein Abteilungs-Chat) erscheinen ebenfalls in Ihrer Gesprächsliste. Klicken Sie darauf, um am Gespräch teilzunehmen.
+
+### 5.6 MVA Support-Bot
+
+Ganz oben in Ihrer Gesprächsliste finden Sie automatisch ein Gespräch mit **„MVA Support"** (Bot-Symbol). Hier können Sie Fragen zur Bedienung der Anwendung stellen — der Bot antwortet innerhalb weniger Sekunden.
+
+Beispiele für Fragen an den Support-Bot:
+- „Wie beantrage ich Urlaub?"
+- „Wie funktioniert das Einstempeln?"
+- „Wo finde ich meinen Dienstplan?"
 
 ---
 
