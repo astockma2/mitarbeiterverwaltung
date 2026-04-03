@@ -39,8 +39,14 @@ export default function Chat({ userId }: Props) {
       const connect = () => {
         const wsHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
           ? '127.0.0.1' : window.location.hostname;
-        const wsUrl = `ws://${wsHost}:8000/api/v1/chat/ws/${token}`;
+        const wsUrl = `ws://${wsHost}:8000/api/v1/chat/ws`;
         const socket = new WebSocket(wsUrl);
+
+        // Token als erste Nachricht nach dem Handshake senden (nicht in der URL)
+        socket.onopen = () => {
+          socket.send(JSON.stringify({ action: 'auth', token }));
+          console.log('WS verbunden');
+        };
 
         socket.onmessage = (event) => {
           const data = JSON.parse(event.data);
@@ -56,7 +62,6 @@ export default function Chat({ userId }: Props) {
           }
         };
 
-        socket.onopen = () => console.log('WS verbunden');
         socket.onclose = (e) => {
           console.log('WS getrennt', e.code);
           // Reconnect nach 3 Sekunden
