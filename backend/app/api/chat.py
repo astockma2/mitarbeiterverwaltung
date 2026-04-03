@@ -253,7 +253,7 @@ async def _handle_bot_response(
                     "sender_name": "MVA Support",
                     "content": response_text,
                     "message_type": "TEXT",
-                    "created_at": bot_msg.created_at.isoformat(),
+                    "created_at": bot_msg.created_at.isoformat() + "Z",
                 },
             )
     except Exception as e:
@@ -342,10 +342,10 @@ async def list_conversations(
                 "content": last_msg.content if last_msg else None,
                 "sender_id": last_msg.sender_id if last_msg else None,
                 "sender_name": member_names.get(last_msg.sender_id, "") if last_msg else None,
-                "created_at": last_msg.created_at.isoformat() if last_msg else None,
+                "created_at": last_msg.created_at.isoformat() + "Z" if last_msg else None,
             } if last_msg else None,
             "unread_count": unread,
-            "created_at": conv.created_at.isoformat(),
+            "created_at": conv.created_at.isoformat() + "Z",
         })
 
     # Sortieren: Konversationen mit neuester Nachricht zuerst
@@ -472,7 +472,7 @@ async def get_messages(
             "sender_name": sender_map.get(m.sender_id, ""),
             "content": m.content,
             "message_type": m.message_type,
-            "created_at": m.created_at.isoformat(),
+            "created_at": m.created_at.isoformat() + "Z",
             "edited_at": m.edited_at.isoformat() if m.edited_at else None,
         }
         for m in reversed(messages)  # Chronologisch
@@ -515,7 +515,7 @@ async def send_message(
         "sender_name": sender_name,
         "content": msg.content,
         "message_type": msg.message_type,
-        "created_at": msg.created_at.isoformat(),
+        "created_at": msg.created_at.isoformat() + "Z",
     }
 
     # Per WebSocket an alle Mitglieder senden
@@ -655,5 +655,5 @@ async def _create_message(
         "sender_name": sender_name,
         "content": msg.content,
         "message_type": msg.message_type,
-        "created_at": msg.created_at.isoformat(),
+        "created_at": msg.created_at.isoformat() + "Z",
     }
