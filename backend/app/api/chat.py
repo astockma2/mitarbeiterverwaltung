@@ -307,7 +307,7 @@ async def create_conversation(
 @router.get("/conversations/{conversation_id}/messages")
 async def get_messages(
     conversation_id: int,
-    before: Optional[str] = Query(None),
+    before: Optional[datetime] = Query(None),
     limit: int = Query(50, le=100),
     current_user: Employee = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
