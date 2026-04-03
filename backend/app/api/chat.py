@@ -479,7 +479,22 @@ async def _mark_read(db: AsyncSession, conversation_id: int, employee_id: int):
 async def _create_message(
     db: AsyncSession, conversation_id: int, sender_id: int, content: str
 ) -> dict | None:
-    """Nachricht erstellen und als dict zurueckgeben."""
+    """Nachricht erstellen und als dict zurückgeben."""
+    # Mitgliedschaftsprüfung: Sender muss Mitglied der Konversation sein
+    member_check = await db.execute(
+        select(ConversationMember).where(
+            ConversationMember.conversation_id == conversation_id,
+            ConversationMember.employee_id == sender_id,
+        )
+    )
+    if not member_check.scalar_one_or_none():
+        log.warning(
+            "Unbefugter Nachrichtenversand verhindert: Employee %s ist kein Mitglied von Konversation %s",
+            sender_id,
+            conversation_id,
+        )
+        return None
+
     msg = Message(
         conversation_id=conversation_id,
         sender_id=sender_id,
