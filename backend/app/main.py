@@ -77,7 +77,10 @@ app.include_router(tickets_router, prefix=API_PREFIX)
 async def global_exception_handler(request: Request, exc: Exception):
     tb = traceback.format_exception(type(exc), exc, exc.__traceback__)
     logging.getLogger(__name__).error("Unhandled error: %s\n%s", exc, "".join(tb))
-    return JSONResponse(status_code=500, content={"detail": str(exc)})
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Interner Serverfehler. Bitte Administrator kontaktieren."},
+    )
 
 
 @app.get("/api/health")
