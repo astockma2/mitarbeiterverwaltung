@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -74,8 +74,10 @@ class ConversationCreate(BaseModel):
     name: Optional[str] = None
     member_ids: list[int]
 
+MAX_MESSAGE_LENGTH = 10_000
+
 class MessageCreate(BaseModel):
-    content: str
+    content: str = Field(..., min_length=1, max_length=MAX_MESSAGE_LENGTH)
     message_type: str = "TEXT"
 
 
@@ -104,7 +106,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
 
             if action == "message":
                 conv_id = data.get("conversation_id")
-                content = data.get("content", "").strip()
+                content = data.get("content", "").strip()[:MAX_MESSAGE_LENGTH]
                 if conv_id and content:
                     async for db in get_db():
                         msg = await _create_message(
