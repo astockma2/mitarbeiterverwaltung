@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../services/api_service.dart';
+import '../services/auth_provider.dart';
 import '../models/time_entry.dart';
 import 'package:intl/intl.dart';
 
@@ -18,6 +20,7 @@ class TimeClockScreenState extends State<TimeClockScreen> {
   List<TimeEntry> _entries = [];
   bool _loading = true;
   bool _acting = false;
+  bool _loadFailed = false;
   int _breakMinutes = 30;
   Timer? _ticker;
   DateTime _now = DateTime.now();
@@ -43,7 +46,7 @@ class TimeClockScreenState extends State<TimeClockScreen> {
   Future<void> reload() => _load();
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() { _loading = true; _loadFailed = false; });
     try {
       final now = DateFormat('yyyy-MM-dd').format(DateTime.now());
       final results = await Future.wait([
@@ -54,8 +57,14 @@ class TimeClockScreenState extends State<TimeClockScreen> {
       _status = results[0] as ClockStatus;
       _today = results[1] as DailySummary;
       _entries = results[2] as List<TimeEntry>;
-    } catch (_) {}
-    setState(() => _loading = false);
+      setState(() => _loading = false);
+    } on ApiException catch (e) {
+      if (e.statusCode == 401) {
+        _handleUnauthorized();
+        return;
+      }
+      setState(() { _loading = false; _loadFailed = true; });
+    }
   }
 
   Future<void> _clockIn() async {
@@ -64,7 +73,11 @@ class TimeClockScreenState extends State<TimeClockScreen> {
       await ApiService.clockIn();
       await _load();
     } on ApiException catch (e) {
-      _showError(e.message);
+      if (e.statusCode == 401) {
+        _handleUnauthorized();
+      } else {
+        _showError(e.message);
+      }
     }
     setState(() => _acting = false);
   }
@@ -84,7 +97,11 @@ class TimeClockScreenState extends State<TimeClockScreen> {
       await ApiService.clockOut(breakMinutes: result);
       await _load();
     } on ApiException catch (e) {
-      _showError(e.message);
+      if (e.statusCode == 401) {
+        _handleUnauthorized();
+      } else {
+        _showError(e.message);
+      }
     }
     setState(() => _acting = false);
   }
@@ -93,6 +110,11 @@ class TimeClockScreenState extends State<TimeClockScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg), backgroundColor: Colors.red),
     );
+  }
+
+  void _handleUnauthorized() {
+    if (!mounted) return;
+    context.read<AuthProvider>().logout();
   }
 
   /// Berechnet die laufende Arbeitszeit seit Einstempeln
@@ -131,7 +153,27 @@ class TimeClockScreenState extends State<TimeClockScreen> {
       appBar: AppBar(title: const Text('Zeiterfassung')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
+          : _loadFailed
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.wifi_off, size: 48, color: Colors.grey.shade400),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Laden fehlgeschlagen',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: _load,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Erneut versuchen'),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
                 padding: const EdgeInsets.all(16),
