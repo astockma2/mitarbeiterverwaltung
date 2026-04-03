@@ -701,6 +701,21 @@ async def send_message(
         **response,
     })
 
+    # Push-Notification an Offline-User
+    online_users = manager.get_online_users()
+    try:
+        await send_push_notification(
+            db,
+            recipient_ids=[m for m in member_ids if m != current_user.id],
+            sender_name=sender_name,
+            message_content=data.content.strip(),
+            conversation_id=conversation_id,
+            message_type=data.message_type,
+            exclude_online=online_users,
+        )
+    except Exception as e:
+        log.warning("Push-Notification fehlgeschlagen: %s", e)
+
     # Bot-Antwort auslösen falls Empfänger der Support-Bot ist
     bot_id = await _find_bot_in_direct_conv(db, conversation_id)
     if bot_id:

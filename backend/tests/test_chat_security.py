@@ -114,3 +114,63 @@ async def test_download_file_gueltig_akzeptiert(tmp_path):
             db=db,
         )
     assert response.path == str(test_file)
+
+
+@pytest.mark.asyncio
+async def test_send_message_ruft_push_notification_auf():
+    """REST-Endpoint send_message muss send_push_notification für Offline-User aufrufen."""
+    from datetime import datetime
+
+    from fastapi import BackgroundTasks
+    from app.api.chat import send_message
+    from app.models.message import MessageCreate
+
+    current_user = MagicMock()
+    current_user.id = 1
+    current_user.first_name = "Max"
+    current_user.last_name = "Mustermann"
+
+    member_check = MagicMock()
+    member_check.scalar_one_or_none.return_value = MagicMock()
+
+    member_rows = MagicMock()
+    member_rows.scalars.return_value.all.return_value = [1, 2]
+
+    db = AsyncMock()
+    db.execute.side_effect = [member_check, member_rows]
+    db.flush = AsyncMock()
+
+    def fake_add(obj):
+        obj.id = 10
+        obj.created_at = datetime(2026, 1, 1)
+        obj.content = "Hallo Welt"
+        obj.message_type = "TEXT"
+        obj.file_path = None
+
+    db.add.side_effect = fake_add
+
+    data = MessageCreate(content="Hallo Welt", message_type="TEXT")
+    background_tasks = BackgroundTasks()
+
+    with (
+        patch("app.api.chat.manager") as mock_manager,
+        patch("app.api.chat.send_push_notification", new_callable=AsyncMock) as mock_push,
+        patch("app.api.chat._find_bot_in_direct_conv", new_callable=AsyncMock, return_value=None),
+    ):
+        mock_manager.send_to_conversation = AsyncMock()
+        mock_manager.get_online_users.return_value = set()
+
+        result = await send_message(
+            conversation_id=5,
+            data=data,
+            background_tasks=background_tasks,
+            current_user=current_user,
+            db=db,
+        )
+
+    assert result["content"] == "Hallo Welt"
+    mock_push.assert_awaited_once()
+    call_kwargs = mock_push.call_args.kwargs
+    # Sender darf keine eigene Push-Notification erhalten
+    assert current_user.id not in call_kwargs["recipient_ids"]
+    assert call_kwargs["conversation_id"] == 5
