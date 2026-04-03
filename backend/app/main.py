@@ -91,14 +91,14 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "ok", "version": "1.3.1"}
+    return {"status": "ok", "version": "1.4.0"}
 
 
 @app.get("/api/v1/app/version")
 async def app_version():
     """Aktuelle App-Version fuer Auto-Update-Check."""
     return {
-        "version": "1.3.1",
+        "version": "1.4.0",
         "download_url": "https://mva.c3po42.de/download/app-release.apk",
         "force_update": False,
     }
