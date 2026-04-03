@@ -1,11 +1,8 @@
-"""KI-Support-Bot basierend auf Claude (Anthropic API)."""
+"""KI-Support-Bot basierend auf Claude Code CLI."""
 
+import asyncio
 import logging
 from pathlib import Path
-
-import anthropic
-
-from app.config import get_settings
 
 log = logging.getLogger(__name__)
 
@@ -45,56 +42,46 @@ def _lade_handbuch() -> str:
 
 
 async def get_bot_response(user_message: str, conversation_history: list[dict]) -> str:
-    """Erzeugt eine Bot-Antwort ueber Claude (Anthropic API)."""
+    """Erzeugt eine Bot-Antwort ueber Claude Code CLI (nutzt Claude Max Abo)."""
     try:
-        settings = get_settings()
-        if not settings.anthropic_api_key:
+        # Konversations-Kontext aufbauen
+        context_parts = []
+        for msg in conversation_history[-10:]:
+            role = "Assistent" if msg.get("is_bot") else "Benutzer"
+            context_parts.append(f"{role}: {msg['content']}")
+
+        context = "\n".join(context_parts)
+
+        prompt = SYSTEM_PROMPT.format(handbuch_inhalt=_lade_handbuch())
+        if context:
+            prompt += f"\n\nBisheriger Chatverlauf:\n{context}\n"
+        prompt += f"\nBenutzer: {user_message}\n\nAntworte als MVA Support-Assistent:"
+
+        # Claude CLI aufrufen
+        proc = await asyncio.create_subprocess_exec(
+            "claude", "--print", "-p", prompt,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            stdin=asyncio.subprocess.DEVNULL,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+
+        if proc.returncode != 0:
+            err = stderr.decode().strip()
+            log.error("Claude CLI Fehler (exit %d): %s", proc.returncode, err)
             return (
                 "Der KI-Support ist momentan nicht verfuegbar. "
                 "Bitte wenden Sie sich an die IT-Abteilung."
             )
 
-        client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+        return stdout.decode().strip()
 
-        # Conversation History als Claude Messages aufbauen
-        messages = []
-        for msg in conversation_history[-10:]:
-            role = "assistant" if msg.get("is_bot") else "user"
-            messages.append({"role": role, "content": msg["content"]})
-
-        # Aktuelle Frage
-        messages.append({"role": "user", "content": user_message})
-
-        response = await client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=1024,
-            system=SYSTEM_PROMPT.format(handbuch_inhalt=_lade_handbuch()),
-            messages=messages,
-        )
-
-        return response.content[0].text
-
-    except anthropic.AuthenticationError as e:
-        log.error("Anthropic Auth-Fehler (API Key ungültig?): %s", e)
-        return (
-            "Der KI-Support ist momentan nicht verfügbar. "
-            "Bitte wenden Sie sich an die IT-Abteilung."
-        )
-    except anthropic.RateLimitError as e:
-        log.warning("Anthropic Rate-Limit erreicht: %s", e)
-        return (
-            "Der KI-Support ist momentan überlastet. "
-            "Bitte versuchen Sie es in einigen Minuten erneut."
-        )
-    except anthropic.APIError as e:
-        log.error("Anthropic API-Fehler (status=%s): %s", e.status_code, e)
-        return (
-            "Es ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut "
-            "oder wenden Sie sich an die IT-Abteilung."
-        )
+    except asyncio.TimeoutError:
+        log.error("Claude CLI Timeout nach 30s")
+        return "Die Antwort hat zu lange gedauert. Bitte versuchen Sie es erneut."
     except Exception as e:
-        log.error("Unbekannter Fehler bei Bot-Antwort: %s", e, exc_info=True)
+        log.error("Fehler bei Bot-Antwort: %s", e)
         return (
-            "Es ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut "
+            "Es ist ein Fehler aufgetreten. Bitte versuchen Sie es spaeter erneut "
             "oder wenden Sie sich an die IT-Abteilung."
         )
