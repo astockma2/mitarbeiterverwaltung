@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/user.dart';
@@ -43,21 +45,37 @@ class ApiService {
   // --- Generische HTTP-Methoden ---
 
   static Future<dynamic> _get(String path, {Map<String, String>? params}) async {
-    final uri = Uri.parse('$baseUrl$path').replace(queryParameters: params);
-    final headers = await _authHeaders();
-    final response = await http.get(uri, headers: headers);
-    return _handleResponse(response);
+    try {
+      final uri = Uri.parse('$baseUrl$path').replace(queryParameters: params);
+      final headers = await _authHeaders();
+      final response = await http.get(uri, headers: headers);
+      return _handleResponse(response);
+    } on ApiException {
+      rethrow;
+    } on SocketException {
+      throw ApiException('Server nicht erreichbar', 0);
+    } on TimeoutException {
+      throw ApiException('Zeitüberschreitung – bitte erneut versuchen', 0);
+    }
   }
 
   static Future<dynamic> _post(String path, {Map<String, dynamic>? body}) async {
-    final uri = Uri.parse('$baseUrl$path');
-    final headers = await _authHeaders();
-    final response = await http.post(
-      uri,
-      headers: headers,
-      body: body != null ? jsonEncode(body) : null,
-    );
-    return _handleResponse(response);
+    try {
+      final uri = Uri.parse('$baseUrl$path');
+      final headers = await _authHeaders();
+      final response = await http.post(
+        uri,
+        headers: headers,
+        body: body != null ? jsonEncode(body) : null,
+      );
+      return _handleResponse(response);
+    } on ApiException {
+      rethrow;
+    } on SocketException {
+      throw ApiException('Server nicht erreichbar', 0);
+    } on TimeoutException {
+      throw ApiException('Zeitüberschreitung – bitte erneut versuchen', 0);
+    }
   }
 
   static dynamic _handleResponse(http.Response response) {
