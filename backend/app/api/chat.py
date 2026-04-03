@@ -935,7 +935,12 @@ async def download_file(
     if not member.scalar_one_or_none():
         raise HTTPException(403, "Kein Zugriff auf diese Datei")
 
-    full_path = Path(settings.upload_dir) / file_path
+    full_path = (Path(settings.upload_dir) / file_path).resolve()
+    upload_root = Path(settings.upload_dir).resolve()
+
+    if not str(full_path).startswith(str(upload_root)):
+        raise HTTPException(400, "Ungültiger Dateipfad")
+
     if not full_path.exists() or not full_path.is_file():
         raise HTTPException(404, "Datei nicht gefunden")
 

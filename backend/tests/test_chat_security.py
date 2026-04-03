@@ -1,10 +1,12 @@
 """Tests für die Sicherheitsprüfungen im Chat-Modul."""
 
-from unittest.mock import AsyncMock, MagicMock
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fastapi import HTTPException
 
-from app.api.chat import _create_message
+from app.api.chat import _create_message, download_file
 
 
 def make_db_with_member(is_member: bool) -> AsyncMock:
@@ -59,3 +61,56 @@ async def test_create_message_erlaubt_mitglied():
     assert result["type"] == "new_message"
     assert result["conversation_id"] == 42
     assert result["sender_id"] == 7
+
+
+def make_db_with_member_for_download(is_member: bool) -> AsyncMock:
+    scalar = MagicMock()
+    scalar.scalar_one_or_none.return_value = MagicMock() if is_member else None
+    db = AsyncMock()
+    db.execute.return_value = scalar
+    return db
+
+
+@pytest.mark.asyncio
+async def test_download_file_path_traversal_blockiert():
+    """Path-Traversal-Angriffe müssen mit HTTP 400 abgewiesen werden."""
+    fake_user = MagicMock()
+    fake_user.id = 1
+    db = make_db_with_member_for_download(is_member=True)
+
+    fake_settings = MagicMock()
+    fake_settings.upload_dir = "/opt/mva/uploads"
+
+    with patch("app.api.chat.get_settings", return_value=fake_settings):
+        with pytest.raises(HTTPException) as exc_info:
+            await download_file(
+                file_path="chat/1/../../../etc/passwd",
+                current_user=fake_user,
+                db=db,
+            )
+    assert exc_info.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_download_file_gueltig_akzeptiert(tmp_path):
+    """Gültige Pfade innerhalb des Upload-Verzeichnisses werden akzeptiert."""
+    fake_user = MagicMock()
+    fake_user.id = 1
+    db = make_db_with_member_for_download(is_member=True)
+
+    upload_dir = tmp_path / "uploads"
+    chat_dir = upload_dir / "chat" / "1"
+    chat_dir.mkdir(parents=True)
+    test_file = chat_dir / "test.txt"
+    test_file.write_text("Testinhalt")
+
+    fake_settings = MagicMock()
+    fake_settings.upload_dir = str(upload_dir)
+
+    with patch("app.api.chat.get_settings", return_value=fake_settings):
+        response = await download_file(
+            file_path="chat/1/test.txt",
+            current_user=fake_user,
+            db=db,
+        )
+    assert response.path == str(test_file)
