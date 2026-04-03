@@ -30,7 +30,6 @@ class ConnectionManager:
         self.connections: dict[int, list[WebSocket]] = {}
 
     async def connect(self, websocket: WebSocket, employee_id: int):
-        await websocket.accept()
         if employee_id not in self.connections:
             self.connections[employee_id] = []
         self.connections[employee_id].append(websocket)
@@ -81,15 +80,30 @@ class MessageCreate(BaseModel):
 
 # ── WebSocket-Endpoint ───────────────────────────────────────────
 
-@router.websocket("/ws/{token}")
-async def websocket_endpoint(websocket: WebSocket, token: str):
-    """WebSocket-Verbindung fuer Echtzeit-Chat."""
+@router.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """WebSocket-Verbindung für Echtzeit-Chat.
+
+    Authentifizierung erfolgt über die erste JSON-Nachricht nach dem Handshake:
+    {"action": "auth", "token": "<JWT>"}
+
+    Das Token wird damit nicht in der URL übertragen und erscheint nicht in
+    Server-Logs, Browser-History oder Proxy-Logs.
+    """
     from app.auth.jwt import decode_token
+
+    await websocket.accept()
+
     try:
+        auth_msg = await websocket.receive_json()
+        if auth_msg.get("action") != "auth":
+            await websocket.close(code=4001, reason="Authentifizierung erwartet")
+            return
+        token = auth_msg.get("token", "")
         payload = decode_token(token)
         employee_id = int(payload["sub"])
     except Exception:
-        await websocket.close(code=4001, reason="Ungueltig")
+        await websocket.close(code=4001, reason="Ungültig")
         return
 
     await manager.connect(websocket, employee_id)
