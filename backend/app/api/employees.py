@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas import (
     EmployeeCreate,
+    EmployeeDirectoryResponse,
     EmployeeListResponse,
     EmployeeResponse,
     EmployeeUpdate,
@@ -15,7 +16,7 @@ from app.api.schemas import (
     QualificationResponse,
 )
 from app.auth.jwt import get_current_user
-from app.auth.permissions import can_view_employee, is_hr
+from app.auth.permissions import can_view_employee, is_hr, is_manager
 from app.database import get_db
 from app.models.employee import Employee, UserRole
 from app.models.qualification import Qualification
@@ -34,14 +35,28 @@ async def list_employees(
     db: AsyncSession = Depends(get_db),
     current_user: Employee = Depends(get_current_user),
 ):
-    """Liste aller Mitarbeiter mit Suche, Filter und Paginierung."""
+    """Liste der Mitarbeiter – Felder und Umfang abhaengig von der Rolle:
+    - ADMIN/HR: Alle Mitarbeiter mit vollen Listendetails
+    - TEAM_LEADER/DEPARTMENT_MANAGER: Nur eigene Abteilung, volle Listendetails
+    - EMPLOYEE: Alle aktiven Mitarbeiter, aber nur Name und Abteilung (DSGVO)
+    """
     query = select(Employee)
 
-    # Filter
-    if is_active is not None:
-        query = query.where(Employee.is_active == is_active)
-    if department_id is not None:
-        query = query.where(Employee.department_id == department_id)
+    if is_hr(current_user):
+        # HR/Admin: voller Zugriff, alle Filter anwendbar
+        if is_active is not None:
+            query = query.where(Employee.is_active == is_active)
+        if department_id is not None:
+            query = query.where(Employee.department_id == department_id)
+    elif is_manager(current_user):
+        # Team-/Abteilungsleiter: nur eigene Abteilung
+        query = query.where(Employee.department_id == current_user.department_id)
+        if is_active is not None:
+            query = query.where(Employee.is_active == is_active)
+    else:
+        # Normaler Mitarbeiter: nur aktive Kollegen sichtbar, kein Abteilungsfilter
+        query = query.where(Employee.is_active == True)  # noqa: E712
+
     if search:
         search_term = f"%{search}%"
         query = query.where(
@@ -62,8 +77,14 @@ async def list_employees(
     result = await db.execute(query)
     employees = result.scalars().all()
 
+    # Rollenabhaengiges Response-Schema
+    if is_hr(current_user) or is_manager(current_user):
+        items = [EmployeeListResponse.model_validate(e) for e in employees]
+    else:
+        items = [EmployeeDirectoryResponse.model_validate(e) for e in employees]
+
     return PaginatedResponse(
-        items=[EmployeeListResponse.model_validate(e) for e in employees],
+        items=items,
         total=total,
         page=page,
         page_size=page_size,

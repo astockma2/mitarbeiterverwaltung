@@ -164,6 +164,25 @@ class EmployeeListResponse(BaseModel):
         return data
 
 
+class EmployeeDirectoryResponse(BaseModel):
+    """Reduzierte Mitarbeiteransicht fuer EMPLOYEE-Rolle (DSGVO-konform)."""
+
+    id: int
+    first_name: str
+    last_name: str
+    department_id: Optional[int]
+    department_name: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+    @classmethod
+    def model_validate(cls, obj, **kwargs):
+        data = super().model_validate(obj, **kwargs)
+        if hasattr(obj, 'department') and obj.department:
+            data.department_name = obj.department.name
+        return data
+
+
 # === Qualification ===
 
 class QualificationCreate(BaseModel):
