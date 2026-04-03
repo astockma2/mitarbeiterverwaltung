@@ -1,0 +1,755 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const base = import.meta.env.BASE_URL;
+
+// Kapitel für das Inhaltsverzeichnis
+const kapitel = [
+  { id: 'erste-schritte',       nr: '1', titel: 'Erste Schritte' },
+  { id: 'zeiterfassung',        nr: '2', titel: 'Zeiterfassung' },
+  { id: 'abwesenheiten',        nr: '3', titel: 'Abwesenheiten' },
+  { id: 'dienstplan',           nr: '4', titel: 'Dienstplan' },
+  { id: 'nachrichten',          nr: '5', titel: 'Nachrichten / Chat' },
+  { id: 'abteilungsleiter',     nr: '6', titel: 'Für Abteilungsleiter' },
+  { id: 'hr-administration',    nr: '7', titel: 'Für HR und Administration' },
+  { id: 'faq',                  nr: '', titel: 'Häufige Fragen' },
+];
+---
+
+<Layout
+  title="Benutzerhandbuch"
+  description="Benutzerhandbuch für die MVA Mitarbeiterverwaltung der Ilm-Kreis-Kliniken — Zeiterfassung, Dienstplan, Abwesenheiten und mehr."
+>
+
+  <!-- Seitenheader -->
+  <div class="bg-gradient-to-r from-blue-700 to-blue-800 text-white py-12 px-4">
+    <div class="max-w-4xl mx-auto">
+      <div class="text-blue-200 text-sm font-medium mb-2 uppercase tracking-wide">Dokumentation</div>
+      <h1 class="text-3xl md:text-4xl font-extrabold mb-3">Benutzerhandbuch</h1>
+      <p class="text-blue-100 text-lg">MVA Mitarbeiterverwaltung · Ilm-Kreis-Kliniken</p>
+      <div class="mt-2 text-blue-200 text-sm">Version 1.0 · Stand: April 2026</div>
+
+      <!-- PDF-Download -->
+      <a
+        href={`${base}/benutzerhandbuch.pdf`}
+        download
+        class="mt-6 inline-flex items-center gap-2 bg-white text-blue-700 px-5 py-2.5 rounded-lg font-semibold text-sm hover:bg-blue-50 transition-colors shadow"
+      >
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        Als PDF herunterladen
+      </a>
+    </div>
+  </div>
+
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <div class="flex flex-col lg:flex-row gap-10">
+
+      <!-- Inhaltsverzeichnis (Sidebar) -->
+      <aside class="lg:w-64 shrink-0">
+        <div class="lg:sticky lg:top-24">
+          <nav class="bg-gray-50 border border-gray-200 rounded-xl p-5">
+            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Inhaltsverzeichnis</div>
+            <ol class="space-y-1.5">
+              {kapitel.map(k => (
+                <li>
+                  <a
+                    href={`#${k.id}`}
+                    class="flex items-baseline gap-2 text-sm text-gray-700 hover:text-blue-700 hover:underline transition-colors"
+                  >
+                    {k.nr && <span class="text-gray-400 font-mono text-xs w-5 shrink-0">{k.nr}.</span>}
+                    <span>{k.titel}</span>
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </nav>
+        </div>
+      </aside>
+
+      <!-- Handbuch-Inhalt -->
+      <article class="flex-1 min-w-0 handbuch-content">
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- 1. Erste Schritte -->
+        <!-- ═══════════════════════════════════════════ -->
+        <section id="erste-schritte" class="mb-14 scroll-mt-24">
+          <h2>1. Erste Schritte</h2>
+
+          <h3 id="anmelden-browser">1.1 Anmelden im Browser (Web)</h3>
+          <ol>
+            <li>Öffnen Sie Ihren Browser (z.&nbsp;B. Chrome, Firefox, Edge).</li>
+            <li>Geben Sie die Adresse <strong>https://mva.c3po42.de</strong> ein und drücken Sie Enter.</li>
+            <li>Die Anmeldeseite erscheint mit dem Logo der Ilm-Kreis-Kliniken.</li>
+            <li>Geben Sie Ihren <strong>Benutzernamen</strong> ein (z.&nbsp;B. <code>m.mustermann</code>).</li>
+            <li>Geben Sie Ihr <strong>Passwort</strong> ein.</li>
+            <li>Klicken Sie auf den blauen Button <strong>„Anmelden"</strong>.</li>
+          </ol>
+
+          <div class="screenshot-placeholder">Screenshot: Anmeldeseite mit Benutzername- und Passwortfeld</div>
+
+          <blockquote>
+            <strong>Hinweis:</strong> Ihr Benutzername entspricht Ihrem Windows-Anmeldekonto im Krankenhaus.
+            Wenden Sie sich bei Fragen an die IT-Abteilung.
+          </blockquote>
+
+          <h3 id="anmelden-app">1.2 Anmelden in der Android-App</h3>
+          <ol>
+            <li>Installieren Sie die App <strong>„MVA Ilm-Kreis-Kliniken"</strong> auf Ihrem Android-Gerät.</li>
+            <li>Öffnen Sie die App.</li>
+            <li>Geben Sie Ihren Benutzernamen und Ihr Passwort ein.</li>
+            <li>Tippen Sie auf <strong>„Anmelden"</strong>.</li>
+          </ol>
+
+          <div class="screenshot-placeholder">Screenshot: App-Anmeldebildschirm</div>
+
+          <h3 id="passwort">1.3 Passwort zurücksetzen</h3>
+          <p>
+            Das Passwort wird über Ihr Windows-Konto im Krankenhaus verwaltet.
+            Eine Selbstzurücksetzung ist in der Anwendung derzeit nicht möglich.
+          </p>
+          <p><strong>Bitte wenden Sie sich bei einem vergessenen Passwort direkt an:</strong></p>
+          <ul>
+            <li>Die IT-Abteilung Ihres Standorts, oder</li>
+            <li>Ihren Vorgesetzten, der die IT informieren kann.</li>
+          </ul>
+
+          <h3 id="abmelden">1.4 Abmelden</h3>
+          <p>Um sich sicher abzumelden:</p>
+          <ol>
+            <li>Klicken Sie links unten in der dunklen Seitenleiste auf den roten Link <strong>„Abmelden"</strong> (mit dem Pfeil-Symbol).</li>
+            <li>Sie werden automatisch zur Anmeldeseite weitergeleitet.</li>
+          </ol>
+
+          <blockquote>
+            <strong>Tipp:</strong> Melden Sie sich immer ab, wenn Sie einen gemeinsam genutzten Computer verwenden.
+          </blockquote>
+
+          <h3 id="oberflaeche">1.5 Die Benutzeroberfläche kennenlernen</h3>
+          <p>Nach der Anmeldung sehen Sie:</p>
+          <ul>
+            <li><strong>Linke Seitenleiste (dunkel):</strong> Hauptnavigation mit allen Bereichen wie Zeiterfassung, Dienstplan, Abwesenheiten usw.</li>
+            <li><strong>Hauptbereich (hell):</strong> Der Inhalt des jeweils ausgewählten Bereichs.</li>
+            <li><strong>Unten in der Seitenleiste:</strong> Ihr Name, Ihre Rolle und der Abmelden-Button.</li>
+          </ul>
+
+          <div class="screenshot-placeholder">Screenshot: Hauptansicht nach dem Login mit beschrifteter Seitenleiste</div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- 2. Zeiterfassung -->
+        <!-- ═══════════════════════════════════════════ -->
+        <section id="zeiterfassung" class="mb-14 scroll-mt-24">
+          <h2>2. Zeiterfassung</h2>
+
+          <h3 id="einstempeln">2.1 Einstempeln (Kommen)</h3>
+          <ol>
+            <li>Klicken Sie in der linken Seitenleiste auf <strong>„Zeiterfassung"</strong>.</li>
+            <li>Sie sehen den Bereich mit dem <strong>grünen Button „Einstempeln"</strong>.</li>
+            <li>Klicken Sie auf diesen Button.</li>
+            <li>Die Ansicht wechselt: Sie sehen nun in grün <strong>„Eingestempelt seit HH:MM"</strong> und die bisherige Arbeitszeit.</li>
+          </ol>
+
+          <div class="screenshot-placeholder">Screenshot: Zeiterfassung — grüner „Einstempeln"-Button</div>
+
+          <blockquote>
+            <strong>Hinweis:</strong> Das Einstempeln ist nur möglich, wenn Sie sich noch nicht eingestempelt haben.
+            Sollte der Button fehlen, sind Sie bereits eingestempelt.
+          </blockquote>
+
+          <h3 id="ausstempeln">2.2 Ausstempeln (Gehen)</h3>
+          <ol>
+            <li>Gehen Sie zu <strong>„Zeiterfassung"</strong>.</li>
+            <li>Neben Ihrer Arbeitszeit sehen Sie ein Feld <strong>„Pause (Min)"</strong>.</li>
+            <li>Tragen Sie die Anzahl Ihrer Pausenminuten ein (Standard: 30 Minuten).</li>
+            <li>Klicken Sie auf den roten Button <strong>„Ausstempeln"</strong>.</li>
+          </ol>
+
+          <div class="screenshot-placeholder">Screenshot: Zeiterfassung — roter „Ausstempeln"-Button mit Pausen-Feld</div>
+
+          <blockquote>
+            <strong>Wichtig:</strong> Geben Sie die Pause korrekt ein. Die Pausenzeiten werden automatisch
+            nach dem Arbeitszeitgesetz (ArbZG) geprüft.
+          </blockquote>
+
+          <h3 id="pausenregelung">2.3 Pausenregelung nach ArbZG</h3>
+          <p>Die Anwendung berechnet Pausen automatisch nach gesetzlichen Vorgaben:</p>
+
+          <table>
+            <thead>
+              <tr><th>Arbeitszeit</th><th>Mindestpause</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Mehr als 6 Stunden</td><td>30 Minuten</td></tr>
+              <tr><td>Mehr als 9 Stunden</td><td>45 Minuten</td></tr>
+            </tbody>
+          </table>
+
+          <p>
+            Sie müssen die tatsächliche Pausenzeit beim Ausstempeln eintragen. Die Nettostunden
+            (abzüglich Pausen) werden automatisch berechnet und in der Übersicht angezeigt.
+          </p>
+
+          <h3 id="tagesuebersicht">2.4 Tagesübersicht einsehen</h3>
+          <p>Auf der Seite „Zeiterfassung" sehen Sie direkt unterhalb des Stempel-Bereichs:</p>
+          <ul>
+            <li><strong>Heute — X.Xh (Pause: XX Min):</strong> Ihre heutige Gesamtarbeitszeit mit blauem Fortschrittsbalken (8-Stunden-Ziel).</li>
+            <li><strong>Heutige Einträge:</strong> Eine Tabelle mit allen Ein- und Ausstempelungen des Tages, inkl. Pausen, Nettozeit, Schichttyp und Zuschlägen (z.&nbsp;B. Nachtzuschlag).</li>
+          </ul>
+
+          <div class="screenshot-placeholder">Screenshot: Tagesübersicht mit Tabelle der heutigen Einträge</div>
+
+          <h3 id="zeitkorrektur">2.5 Zeitkorrektur beantragen</h3>
+          <p>
+            Haben Sie vergessen einzustempeln oder ist ein Fehler aufgetreten? Wenden Sie sich an
+            Ihren <strong>Abteilungsleiter</strong> oder die <strong>Personalabteilung (HR)</strong>.
+          </p>
+          <p>Diese können im System eine Zeitkorrektur vornehmen. Halten Sie folgende Informationen bereit:</p>
+          <ul>
+            <li>Datum</li>
+            <li>Uhrzeitkorrektur (Kommen / Gehen)</li>
+            <li>Grund der Korrektur</li>
+          </ul>
+
+          <blockquote>
+            <strong>Tipp:</strong> Melden Sie Korrekturen möglichst zeitnah — spätestens bis zum Ende des laufenden Monats.
+          </blockquote>
+        </section>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- 3. Abwesenheiten -->
+        <!-- ═══════════════════════════════════════════ -->
+        <section id="abwesenheiten" class="mb-14 scroll-mt-24">
+          <h2>3. Abwesenheiten</h2>
+
+          <h3 id="urlaubsantrag">3.1 Urlaubsantrag stellen</h3>
+          <ol>
+            <li>Klicken Sie in der Seitenleiste auf <strong>„Abwesenheiten"</strong>.</li>
+            <li>Oben sehen Sie Ihr <strong>Urlaubskonto</strong> (Anspruch, genommen, beantragt, verbleibend).</li>
+            <li>Klicken Sie rechts auf den blauen Button <strong>„Neuer Antrag"</strong>.</li>
+            <li>
+              Es erscheint ein Formular. Füllen Sie es aus:
+              <ul>
+                <li><strong>Typ:</strong> Wählen Sie „Urlaub" aus dem Dropdown-Menü.</li>
+                <li><strong>Von:</strong> Geben Sie das Startdatum ein.</li>
+                <li><strong>Bis:</strong> Geben Sie das Enddatum ein.</li>
+                <li><strong>Anmerkung:</strong> Optional — z.&nbsp;B. „Familienurlaub".</li>
+              </ul>
+            </li>
+            <li>Klicken Sie auf den grünen Button <strong>„Absenden"</strong>.</li>
+          </ol>
+
+          <div class="screenshot-placeholder">Screenshot: Abwesenheits-Formular mit ausgefüllten Feldern</div>
+
+          <blockquote>
+            Ihr Antrag erhält den Status <strong>„Beantragt"</strong> (gelb). Sobald der Abteilungsleiter
+            ihn genehmigt, wechselt er zu <strong>„Genehmigt"</strong> (grün).
+          </blockquote>
+
+          <h3 id="urlaubskonto">3.2 Urlaubskonto einsehen (Resturlaub)</h3>
+          <p>Ihr Urlaubskonto wird oben auf der Seite „Abwesenheiten" immer aktuell angezeigt:</p>
+          <ul>
+            <li><strong>Anspruch [Jahr]:</strong> Ihr gesamter Jahresurlaub</li>
+            <li><strong>Genommen:</strong> Bereits genutzter Urlaub</li>
+            <li><strong>Beantragt:</strong> Urlaubstage in Bearbeitung</li>
+            <li><strong>Verbleibend:</strong> Ihr Resturlaub (grün)</li>
+          </ul>
+
+          <div class="screenshot-placeholder">Screenshot: Urlaubskonto-Übersicht</div>
+
+          <h3 id="krankmeldung">3.3 Krankmeldung einreichen</h3>
+          <ol>
+            <li>Gehen Sie zu <strong>„Abwesenheiten"</strong> → <strong>„Neuer Antrag"</strong>.</li>
+            <li>Wählen Sie als Typ <strong>„Krankheit"</strong>.</li>
+            <li>Tragen Sie das erste und das voraussichtlich letzte Krankheitsdatum ein.</li>
+            <li>Klicken Sie auf <strong>„Absenden"</strong>.</li>
+          </ol>
+
+          <blockquote>
+            <strong>Hinweis:</strong> Die Krankmeldung dient der Dokumentation im System.
+            Die ärztliche Bescheinigung geben Sie bitte weiterhin wie gewohnt in der Personalabteilung ab.
+          </blockquote>
+
+          <h3 id="fortbildung">3.4 Fortbildung oder Sonderurlaub beantragen</h3>
+          <p>Das Verfahren ist dasselbe wie beim Urlaubsantrag:</p>
+          <ol>
+            <li><strong>„Neuer Antrag"</strong> klicken.</li>
+            <li>Als Typ <strong>„Fortbildung"</strong> oder <strong>„Sonderurlaub"</strong> wählen.</li>
+            <li>Datum eingeben und ggf. eine Anmerkung hinzufügen (z.&nbsp;B. Name der Fortbildung).</li>
+            <li><strong>„Absenden"</strong> klicken.</li>
+          </ol>
+
+          <h3 id="antragsstatus">3.5 Status eines Antrags prüfen</h3>
+          <p>In der Tabelle unter „Abwesenheiten" sehen Sie alle Ihre Anträge mit ihrem aktuellen Status:</p>
+
+          <table>
+            <thead>
+              <tr><th>Status</th><th>Farbe</th><th>Bedeutung</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Beantragt</td><td>Gelb</td><td>Wartet auf Genehmigung</td></tr>
+              <tr><td>Genehmigt</td><td>Grün</td><td>Vom Vorgesetzten genehmigt</td></tr>
+              <tr><td>Abgelehnt</td><td>Rot</td><td>Vom Vorgesetzten abgelehnt</td></tr>
+              <tr><td>Storniert</td><td>Grau</td><td>Von Ihnen zurückgezogen</td></tr>
+            </tbody>
+          </table>
+
+          <div class="screenshot-placeholder">Screenshot: Abwesenheitsliste mit farbigen Status-Badges</div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- 4. Dienstplan -->
+        <!-- ═══════════════════════════════════════════ -->
+        <section id="dienstplan" class="mb-14 scroll-mt-24">
+          <h2>4. Dienstplan</h2>
+
+          <h3 id="dienstplan-einsehen">4.1 Eigenen Dienstplan einsehen</h3>
+          <ol>
+            <li>Klicken Sie in der Seitenleiste auf <strong>„Mein Dienstplan"</strong>.</li>
+            <li>Oben sehen Sie eine Monatsauswahl (Standard: aktueller Monat).</li>
+            <li>Wählen Sie bei Bedarf einen anderen Monat aus.</li>
+            <li>Der Kalender zeigt alle Ihre geplanten Schichten für den gewählten Monat.</li>
+          </ol>
+
+          <div class="screenshot-placeholder">Screenshot: Dienstplan-Kalender mit eingetragenen Schichten</div>
+
+          <ul>
+            <li><strong>Heute</strong> ist mit einem blauen Rahmen hervorgehoben.</li>
+            <li><strong>Wochenendtage</strong> (Samstag/Sonntag) haben einen hellgrauen Hintergrund.</li>
+          </ul>
+
+          <h3 id="schichten-verstehen">4.2 Schichten verstehen</h3>
+          <p>Jede Schicht wird mit einem farbigen Kürzel angezeigt:</p>
+
+          <table>
+            <thead>
+              <tr><th>Farbe</th><th>Kürzel</th><th>Bedeutung</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Grün</td><td>F</td><td>Frühschicht</td></tr>
+              <tr><td>Gelb</td><td>S</td><td>Spätschicht</td></tr>
+              <tr><td>Blau/Lila</td><td>N</td><td>Nachtschicht</td></tr>
+              <tr><td>Grau</td><td>—</td><td>Sonstige Schicht</td></tr>
+            </tbody>
+          </table>
+
+          <p>
+            Unterhalb des Kalenders finden Sie die <strong>Schichtliste</strong> mit genauen Uhrzeiten
+            (z.&nbsp;B. „06:00–14:00") und dem Status (Bestätigt / offen).
+          </p>
+
+          <blockquote>
+            <strong>Hinweis:</strong> Der Dienstplan wird von Ihrer Abteilungsleitung erstellt und veröffentlicht.
+            Erst nach der Veröffentlichung ist er für Sie sichtbar.
+          </blockquote>
+
+          <h3 id="schichttausch">4.3 Schichttausch beantragen</h3>
+          <p>
+            Ein direkter Schichttausch ist über das System noch nicht möglich. Sprechen Sie Ihren Wunsch
+            für einen Tausch direkt mit Ihrer Abteilungsleitung ab oder schreiben Sie ihr eine Nachricht
+            im <strong>Chat</strong> (siehe Kapitel 5).
+          </p>
+
+          <h3 id="einspringen">4.4 Vertretung anbieten / Einspringen</h3>
+          <p>
+            Wenn Sie bei einer freien Schicht einspringen können, wenden Sie sich direkt an Ihre
+            Abteilungsleitung — persönlich oder über den <strong>Chat</strong> in der Anwendung. Teilen Sie mit:
+          </p>
+          <ul>
+            <li>Das Datum der Schicht</li>
+            <li>Die Schicht (z.&nbsp;B. Frühschicht)</li>
+            <li>Ihre Verfügbarkeit</li>
+          </ul>
+        </section>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- 5. Nachrichten / Chat -->
+        <!-- ═══════════════════════════════════════════ -->
+        <section id="nachrichten" class="mb-14 scroll-mt-24">
+          <h2>5. Nachrichten / Chat</h2>
+
+          <h3 id="einzelnachricht">5.1 Einzelnachricht senden</h3>
+          <ol>
+            <li>Klicken Sie in der Seitenleiste auf <strong>„Nachrichten"</strong>.</li>
+            <li>Links sehen Sie die Liste Ihrer vorhandenen Gespräche.</li>
+            <li>Um ein neues Gespräch zu starten, klicken Sie auf den blauen <strong>„+"-Button</strong> oben rechts in der Nachrichtenliste.</li>
+            <li>Eine Mitarbeiterliste erscheint. Suchen Sie nach dem Namen (Suchfeld oben).</li>
+            <li>Klicken Sie auf den gewünschten Mitarbeiter.</li>
+            <li>Das Chatfenster öffnet sich rechts.</li>
+            <li>Schreiben Sie Ihre Nachricht in das Textfeld unten und drücken Sie <strong>Enter</strong> oder klicken Sie auf den blauen <strong>Senden-Button</strong> (Pfeil).</li>
+          </ol>
+
+          <div class="screenshot-placeholder">Screenshot: Chat-Ansicht mit geöffnetem Gespräch und Texteingabe</div>
+
+          <h3 id="gespraeche">5.2 Bestehende Gespräche öffnen</h3>
+          <p>
+            In der linken Spalte sehen Sie alle Ihre Gespräche. Gespräche mit ungelesenen Nachrichten
+            werden <strong>fett</strong> angezeigt und zeigen eine blaue Zahl (Anzahl ungelesener Nachrichten).
+          </p>
+          <p>Klicken Sie auf ein Gespräch, um es zu öffnen.</p>
+
+          <h3 id="mitarbeiter-suchen">5.3 Mitarbeiter nach Abteilung suchen</h3>
+          <p>
+            Beim Starten eines neuen Chats (Schritt 3–4 oben) sind die Mitarbeiter nach
+            <strong>Abteilungen</strong> gruppiert. Klicken Sie auf den Abteilungsnamen, um die Liste
+            auf- oder zuzuklappen.
+          </p>
+          <p>Ein grüner Punkt neben dem Namen bedeutet: Der Mitarbeiter ist gerade online.</p>
+
+          <div class="screenshot-placeholder">Screenshot: Mitarbeiterliste nach Abteilungen gruppiert</div>
+
+          <h3 id="gruppenchat">5.4 Gruppenchat / Abteilungs-Chat</h3>
+          <p>
+            Bestehende Gruppengespräche (z.&nbsp;B. der Abteilungs-Chat) erscheinen ebenfalls in Ihrer
+            Gesprächsliste. Klicken Sie darauf, um am Gespräch teilzunehmen.
+          </p>
+
+          <blockquote>
+            <strong>Hinweis:</strong> Neue Gruppenkonversationen werden derzeit von der Abteilungsleitung
+            oder der IT eingerichtet.
+          </blockquote>
+        </section>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- 6. Für Abteilungsleiter -->
+        <!-- ═══════════════════════════════════════════ -->
+        <section id="abteilungsleiter" class="mb-14 scroll-mt-24">
+          <h2>6. Für Abteilungsleiter</h2>
+          <p class="lead">
+            Dieser Abschnitt richtet sich an Mitarbeiterinnen und Mitarbeiter mit der Rolle
+            <strong>Abteilungsleitung</strong> oder <strong>Teamleitung</strong>.
+          </p>
+
+          <h3 id="mitarbeiter-liste">6.1 Mitarbeiter der Abteilung einsehen</h3>
+          <ol>
+            <li>Klicken Sie in der Seitenleiste auf <strong>„Mitarbeiter"</strong>.</li>
+            <li>Die Liste zeigt alle Mitarbeiter, nach Abteilung gruppiert.</li>
+            <li>Nutzen Sie das Suchfeld oben (nach Name, Personalnummer oder E-Mail).</li>
+            <li>Mit dem Abteilungs-Dropdown können Sie die Ansicht auf eine bestimmte Abteilung einschränken.</li>
+            <li>Klicken Sie auf eine Zeile, um das Profil eines Mitarbeiters zu öffnen.</li>
+          </ol>
+
+          <div class="screenshot-placeholder">Screenshot: Mitarbeiterliste mit Suchfeld und Abteilungsfilter</div>
+
+          <h3 id="urlaubsantrag-genehmigen">6.2 Urlaubsanträge genehmigen oder ablehnen</h3>
+          <ol>
+            <li>Klicken Sie auf <strong>„Abwesenheiten"</strong>.</li>
+            <li>Als Abteilungsleiter sehen Sie oben zwei Reiter: <strong>„Meine Abwesenheiten"</strong> und <strong>„Offene Anträge (X)"</strong>.</li>
+            <li>Klicken Sie auf <strong>„Offene Anträge"</strong>.</li>
+            <li>Die Tabelle zeigt alle noch nicht bearbeiteten Anträge Ihrer Mitarbeiter.</li>
+            <li>
+              Pro Antrag sehen Sie zwei Buttons:
+              <ul>
+                <li>Grüner <strong>Haken-Button</strong>: Antrag genehmigen</li>
+                <li>Roter <strong>X-Button</strong>: Antrag ablehnen</li>
+              </ul>
+            </li>
+            <li>Klicken Sie den entsprechenden Button.</li>
+          </ol>
+
+          <div class="screenshot-placeholder">Screenshot: Offene Anträge mit grünem Haken und rotem X-Button</div>
+
+          <h3 id="zeitkorrekturen">6.3 Zeitkorrekturen prüfen</h3>
+          <p>
+            Zeitkorrekturen werden von HR oder Admin direkt im System vorgenommen. Als Abteilungsleiter
+            können Sie die Zeiteinträge Ihrer Mitarbeiter über die Auswertungen (HR-Zugang erforderlich)
+            einsehen oder bei Fragen die Personalabteilung kontaktieren.
+          </p>
+
+          <h3 id="dienstplan-erstellen">6.4 Dienstplan erstellen und veröffentlichen</h3>
+          <ol>
+            <li>Klicken Sie in der Seitenleiste auf <strong>„Dienstplanung"</strong>.</li>
+            <li>Klicken Sie oben rechts auf <strong>„Neuer Dienstplan"</strong>.</li>
+            <li>
+              Im Dialog wählen Sie:
+              <ul>
+                <li><strong>Abteilung</strong> (Dropdown)</li>
+                <li><strong>Jahr</strong> und <strong>Monat</strong></li>
+              </ul>
+            </li>
+            <li>Klicken Sie auf <strong>„Erstellen"</strong>.</li>
+          </ol>
+          <p>Der neue Plan erscheint mit dem Status <strong>„Entwurf"</strong> in der Liste.</p>
+
+          <p><strong>Schichten einplanen:</strong></p>
+          <ol>
+            <li>Wählen Sie in der Werkzeugleiste ein Schicht-Kürzel (z.&nbsp;B. „F" für Frühschicht).</li>
+            <li>Klicken Sie in der Tabelle auf <strong>„Anzeigen"</strong> beim gewünschten Plan.</li>
+            <li>Der Kalender zeigt alle Mitarbeiter und alle Tage des Monats.</li>
+            <li><strong>Ziehen</strong> Sie mit der Maus über die gewünschten Zellen (Mitarbeiter × Tag), um Schichten zuzuweisen.</li>
+            <li>Zum Löschen einer Schicht wählen Sie den <strong>„Radierer"</strong> in der Werkzeugleiste und ziehen über die betreffenden Zellen.</li>
+          </ol>
+
+          <p><strong>Dienstplan veröffentlichen:</strong></p>
+          <ol>
+            <li>Klicken Sie in der Planliste auf den grünen Button <strong>„Veröffentlichen"</strong>.</li>
+            <li>Der Status wechselt auf <strong>„Veröffentlicht"</strong> — ab sofort sehen alle Mitarbeiter der Abteilung ihren Dienstplan.</li>
+          </ol>
+
+          <div class="screenshot-placeholder">Screenshot: Dienstplanung mit Werkzeugleiste und Kalender-Raster</div>
+
+          <blockquote>
+            <strong>Hinweis:</strong> Veröffentlichte Pläne können nicht mehr direkt bearbeitet werden.
+            Kontaktieren Sie bei Bedarf die IT.
+          </blockquote>
+
+          <h3 id="besetzung">6.5 Besetzungsübersicht prüfen</h3>
+          <p>
+            In der Kalenderansicht eines Dienstplans sehen Sie auf einen Blick, welche Mitarbeiter an
+            welchem Tag welche Schicht haben. Tage ohne Eintrag (grauer Punkt) sind ungeplant.
+          </p>
+        </section>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- 7. Für HR und Administration -->
+        <!-- ═══════════════════════════════════════════ -->
+        <section id="hr-administration" class="mb-14 scroll-mt-24">
+          <h2>7. Für HR und Administration</h2>
+          <p class="lead">
+            Dieser Abschnitt richtet sich an Mitarbeiterinnen und Mitarbeiter mit der Rolle
+            <strong>HR</strong> oder <strong>Administrator</strong>.
+          </p>
+
+          <h3 id="mitarbeiter-anlegen">7.1 Neuen Mitarbeiter anlegen</h3>
+          <ol>
+            <li>Klicken Sie auf <strong>„Mitarbeiter"</strong> in der Seitenleiste.</li>
+            <li>Klicken Sie oben rechts auf den Button <strong>„Neuer Mitarbeiter"</strong> (falls sichtbar, je nach Berechtigung).</li>
+            <li>
+              Füllen Sie das Formular mit den Stammdaten aus:
+              <ul>
+                <li>Vorname, Nachname</li>
+                <li>Personalnummer</li>
+                <li>E-Mail-Adresse</li>
+                <li>Abteilung, Rolle, Beschäftigungsart</li>
+                <li>Eintrittsdatum, Wochenstunden, Urlaubsanspruch</li>
+              </ul>
+            </li>
+            <li>Klicken Sie auf <strong>„Speichern"</strong>.</li>
+          </ol>
+
+          <blockquote>
+            Der neue Mitarbeiter kann sich mit seinem Windows-Benutzernamen anmelden, sobald das Konto
+            im Active Directory angelegt ist.
+          </blockquote>
+
+          <h3 id="mitarbeiter-deaktivieren">7.2 Mitarbeiter deaktivieren</h3>
+          <ol>
+            <li>Klicken Sie auf <strong>„Mitarbeiter"</strong> und öffnen Sie das Profil des betreffenden Mitarbeiters (Klick auf die Zeile).</li>
+            <li>Klicken Sie auf den Button <strong>„Bearbeiten"</strong> (Stift-Symbol).</li>
+            <li>Setzen Sie den Schalter <strong>„Aktiv"</strong> auf inaktiv.</li>
+            <li>Klicken Sie auf <strong>„Speichern"</strong>.</li>
+          </ol>
+          <p>
+            Der Mitarbeiter erscheint danach mit einem roten <strong>„Inaktiv"</strong>-Badge
+            und kann sich nicht mehr anmelden.
+          </p>
+
+          <div class="screenshot-placeholder">Screenshot: Mitarbeiterprofil mit Bearbeiten-Button</div>
+
+          <h3 id="monatsabschluss">7.3 Monatsabschluss durchführen</h3>
+          <ol>
+            <li>Klicken Sie in der Seitenleiste auf <strong>„Monatsabschluss"</strong>.</li>
+            <li>Wählen Sie das gewünschte <strong>Jahr</strong> und den <strong>Monat</strong> aus.</li>
+            <li>Prüfen Sie die angezeigten Zeiteinträge auf Vollständigkeit.</li>
+            <li>Klicken Sie auf <strong>„Abschluss durchführen"</strong>, um den Monat zu sperren.</li>
+          </ol>
+
+          <blockquote>
+            Nach dem Abschluss können Zeiteinträge des betreffenden Monats nicht mehr verändert werden.
+            Stellen Sie sicher, dass alle Korrekturen vorher eingetragen wurden.
+          </blockquote>
+
+          <div class="screenshot-placeholder">Screenshot: Monatsabschluss-Seite mit Monatsauswahl und Abschluss-Button</div>
+
+          <h3 id="csv-export">7.4 CSV-Export für die Lohnabrechnung (LOGA)</h3>
+          <ol>
+            <li>Klicken Sie auf <strong>„Auswertungen"</strong> in der Seitenleiste.</li>
+            <li>Wählen Sie das gewünschte <strong>Jahr</strong> und den <strong>Monat</strong> aus.</li>
+            <li>Klicken Sie auf den lila Button <strong>„CSV-Export"</strong>.</li>
+            <li>Die Datei wird automatisch heruntergeladen (Name: <code>report_JJJJ_MM.csv</code>).</li>
+            <li>Importieren Sie diese Datei in Ihr Lohnabrechnungssystem (LOGA).</li>
+          </ol>
+
+          <div class="screenshot-placeholder">Screenshot: Auswertungen-Seite mit CSV-Export-Button</div>
+
+          <h3 id="berichte">7.5 Berichte und Auswertungen</h3>
+          <p>Unter <strong>„Auswertungen"</strong> stehen vier Auswertungstypen zur Verfügung:</p>
+
+          <table>
+            <thead>
+              <tr><th>Reiter</th><th>Inhalt</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Jahresübersicht</td><td>Soll/Ist-Stunden, Überstunden, Krank- und Urlaubstage je Mitarbeiter</td></tr>
+              <tr><td>Abteilungen</td><td>Arbeitsstunden und Kranktage je Abteilung (pro Monat)</td></tr>
+              <tr><td>Zuschläge</td><td>Nacht-, Sonntags-, Feiertags- und Samstagszuschläge</td></tr>
+              <tr><td>Abwesenheiten</td><td>Abwesenheitstage nach Typ und Monat, Top-Kranktage</td></tr>
+            </tbody>
+          </table>
+
+          <p><strong>Auswertung laden:</strong></p>
+          <ol>
+            <li>Wählen Sie den gewünschten Reiter.</li>
+            <li>Stellen Sie Jahr (und ggf. Monat) ein.</li>
+            <li>Klicken Sie auf <strong>„Laden"</strong>.</li>
+          </ol>
+
+          <div class="screenshot-placeholder">Screenshot: Auswertungen — Jahresübersicht mit Tabelle und Kennzahlen</div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- FAQ -->
+        <!-- ═══════════════════════════════════════════ -->
+        <section id="faq" class="mb-14 scroll-mt-24">
+          <h2>Häufige Fragen</h2>
+
+          <div class="space-y-6">
+            <div class="faq-item">
+              <h4>Ich kann mich nicht anmelden — was tun?</h4>
+              <p>
+                Prüfen Sie, ob Ihr Benutzername korrekt eingetragen ist (kein „@" oder Domain-Anteil).
+                Wenden Sie sich bei anhaltenden Problemen an die IT-Abteilung.
+              </p>
+            </div>
+
+            <div class="faq-item">
+              <h4>Ich habe vergessen einzustempeln — was jetzt?</h4>
+              <p>
+                Wenden Sie sich an Ihre Abteilungsleitung oder die Personalabteilung.
+                Diese können eine Zeitkorrektur eintragen.
+              </p>
+            </div>
+
+            <div class="faq-item">
+              <h4>Mein Antrag hat den Status „Abgelehnt" — warum?</h4>
+              <p>
+                Sprechen Sie direkt mit Ihrer Abteilungsleitung. Im System gibt es derzeit kein
+                separates Kommentarfeld für Ablehnungsgründe.
+              </p>
+            </div>
+
+            <div class="faq-item">
+              <h4>Ich sehe keinen Dienstplan für den aktuellen Monat.</h4>
+              <p>
+                Der Dienstplan wurde möglicherweise noch nicht veröffentlicht.
+                Sprechen Sie Ihre Abteilungsleitung an.
+              </p>
+            </div>
+
+            <div class="faq-item">
+              <h4>Wie erkenne ich, ob meine Nachricht angekommen ist?</h4>
+              <p>
+                Nachrichten, die Sie senden, erscheinen sofort in Ihrer Ansicht auf der rechten Seite
+                (blauer Hintergrund). Eine separate Lesebestätigung ist derzeit nicht verfügbar.
+              </p>
+            </div>
+          </div>
+
+          <div class="mt-10 p-5 bg-blue-50 border border-blue-200 rounded-xl text-blue-800 text-sm">
+            Bei weiteren Fragen wenden Sie sich an die <strong>IT-Abteilung der Ilm-Kreis-Kliniken</strong>.<br />
+            Dieses Handbuch wird regelmäßig aktualisiert.
+          </div>
+        </section>
+
+        <!-- PDF-Download (Ende der Seite) -->
+        <div class="border-t border-gray-200 pt-8 text-center">
+          <p class="text-gray-600 mb-4">Dieses Handbuch als PDF speichern:</p>
+          <a
+            href={`${base}/benutzerhandbuch.pdf`}
+            download
+            class="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors shadow"
+          >
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Als PDF herunterladen
+          </a>
+        </div>
+
+      </article>
+    </div>
+  </div>
+
+</Layout>
+
+<style>
+  /* ── Handbuch Inhalt Styles ── */
+  .handbuch-content :global(h2) {
+    @apply text-2xl font-bold text-gray-900 mt-10 mb-5 pb-2 border-b border-gray-200;
+  }
+  .handbuch-content :global(h3) {
+    @apply text-lg font-semibold text-gray-800 mt-7 mb-3;
+  }
+  .handbuch-content :global(h4) {
+    @apply text-base font-semibold text-gray-900 mb-1;
+  }
+  .handbuch-content :global(p) {
+    @apply text-gray-700 leading-relaxed mb-4;
+  }
+  .handbuch-content :global(.lead) {
+    @apply text-gray-600 italic mb-6 pl-4 border-l-4 border-blue-200;
+  }
+  .handbuch-content :global(ul) {
+    @apply list-disc list-outside ml-5 mb-4 space-y-1 text-gray-700;
+  }
+  .handbuch-content :global(ol) {
+    @apply list-decimal list-outside ml-5 mb-4 space-y-1.5 text-gray-700;
+  }
+  .handbuch-content :global(li) {
+    @apply leading-relaxed;
+  }
+  .handbuch-content :global(strong) {
+    @apply font-semibold text-gray-900;
+  }
+  .handbuch-content :global(code) {
+    @apply bg-gray-100 text-blue-800 px-1.5 py-0.5 rounded text-sm font-mono;
+  }
+
+  /* Tabellen */
+  .handbuch-content :global(table) {
+    @apply w-full mb-6 border-collapse text-sm;
+  }
+  .handbuch-content :global(thead) {
+    @apply bg-blue-700 text-white;
+  }
+  .handbuch-content :global(thead th) {
+    @apply px-4 py-2.5 text-left font-semibold;
+  }
+  .handbuch-content :global(tbody tr:nth-child(even)) {
+    @apply bg-gray-50;
+  }
+  .handbuch-content :global(tbody tr:hover) {
+    @apply bg-blue-50;
+  }
+  .handbuch-content :global(tbody td) {
+    @apply px-4 py-2.5 border-t border-gray-200 text-gray-700;
+  }
+
+  /* Blockquotes */
+  .handbuch-content :global(blockquote) {
+    @apply border-l-4 border-blue-400 bg-blue-50 px-5 py-3 my-4 rounded-r-lg text-blue-900 text-sm;
+  }
+
+  /* Screenshot-Platzhalter */
+  .handbuch-content :global(.screenshot-placeholder) {
+    @apply flex items-center justify-center my-5 p-6 rounded-xl
+           bg-gray-100 border-2 border-dashed border-gray-300
+           text-gray-500 text-sm italic min-h-[80px];
+  }
+  .handbuch-content :global(.screenshot-placeholder)::before {
+    content: '🖼 ';
+  }
+
+  /* FAQ Items */
+  .handbuch-content :global(.faq-item) {
+    @apply p-5 bg-gray-50 border border-gray-200 rounded-xl;
+  }
+  .handbuch-content :global(.faq-item h4) {
+    @apply text-gray-900 font-semibold mb-2;
+  }
+  .handbuch-content :global(.faq-item p) {
+    @apply mb-0 text-gray-600;
+  }
+</style>
