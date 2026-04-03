@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +18,7 @@ async def dashboard(
 ):
     """Dashboard mit Kennzahlen. Nur HR und Admin."""
     if not is_hr(current_user):
-        return {"error": "Keine Berechtigung"}
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Keine Berechtigung")
 
     total = (
         await db.execute(select(func.count(Employee.id)))
@@ -43,7 +43,7 @@ async def trigger_ad_sync(
 ):
     """AD-Synchronisation manuell ausloesen. Nur Admin."""
     if not is_admin(current_user):
-        return {"error": "Keine Berechtigung"}
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Keine Berechtigung")
 
     result = await sync_all_employees(db)
     return {
