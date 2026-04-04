@@ -33,8 +33,17 @@ services:
         condition: service_healthy
     env_file:
       - .env
+    environment:
+      TZ: Europe/Berlin
+      # Pfad zur Claude CLI-Binary im Container (muss zu den Volume-Mounts passen)
+      # Beispiel: CLAUDE_CLI_PATH=/root/.nvm/versions/node/v22.14.0/bin/claude
+      CLAUDE_CLI_PATH: ${CLAUDE_CLI_PATH:-claude}
     volumes:
       - uploads:/app/uploads
+      # Benutzerhandbuch für den Support-Bot
+      - ./docs:/app/docs:ro
+      # Claude CLI Credentials (für Support-Bot)
+      - /root/.claude:/root/.claude:ro
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
