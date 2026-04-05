@@ -16,9 +16,12 @@ Die Mitarbeiterverwaltung ist eine On-Premise-Webanwendung fuer die IKK Kliniken
 - Zeiterfassung mit Stempelfunktion, Zuschlagsberechnung und Pausenregelung
 - Abwesenheitsverwaltung (Urlaub, Krankheit, Fortbildung) mit Genehmigungsworkflow
 - Schichtplanung mit Regelwerk nach Arbeitszeitgesetz (ArbZG)
-- Interner Chat mit Echtzeit-Nachrichten (WebSocket)
+- Interner Chat mit Echtzeit-Nachrichten (WebSocket), Gruppen, Dateianhängen und Push-Benachrichtigungen
+- KI-Support-Bot (BOT001 „MVA Support") beantwortet Bedienungsfragen im Chat
 - Monatsabschluss und Loga-Export fuer die Lohnabrechnung
 - Auswertungen und Berichte (Jahresuebersicht, Zuschlaege, Abwesenheitsstatistik)
+- Rate-Limiting beim Login (Schutz vor Brute-Force-Angriffen)
+- DSGVO-konforme rollenbasierte Mitarbeiterliste
 
 **Zielgruppe:** Aerzte, Pflegekraefte, Verwaltung, Technik — mit rollenbasiertem Zugriff.
 
@@ -761,7 +764,7 @@ CORS_ORIGINS=https://mitarbeiter.klinik.local
 | **Phase 2** | Zeiterfassung (Stempeln, Berechnung, Korrekturen) | ✅ Abgeschlossen |
 | **Phase 3** | Schichtplanung (Vorlagen, Zuweisung, Regelwerk) | ✅ Abgeschlossen |
 | **Phase 4** | Mobile App (Login, Zeitstempel, Dienstplan, Self-Service) | ✅ Abgeschlossen (Android + iOS Build) |
-| **Phase 5** | Chat und Kommunikation (WebSocket, Push) | ✅ Abgeschlossen (ohne Push) |
+| **Phase 5** | Chat und Kommunikation (WebSocket, Push, Gruppen, Dateianhänge, Support-Bot) | ✅ Abgeschlossen |
 | **Phase 6** | Loga-Export, Monatsabschluss, Auswertungen | ✅ Abgeschlossen |
 | **Phase 7** | Test, Bugfixes, Betriebsrat-Abstimmung, Rollout | ⏳ Ausstehend |
 
@@ -854,13 +857,9 @@ stop.bat        # Alles beenden
 
 | Thema | Beschreibung | Prioritaet |
 |---|---|---|
-| **Keine Tests** | Nur Beispielstruktur vorhanden, keine Unit- oder Integrationstests | Hoch |
 | **Keine Alembic-Migrationen** | Tabellen werden per `create_all()` erstellt — fuer Produktion muessen Migrationen angelegt werden | Hoch |
 | **iOS ohne Code-Signierung** | IPA wird ohne Signierung gebaut — fuer echte Geraete ist ein Apple Developer Account ($99/Jahr) noetig | Niedrig |
-| **Datei-Upload im Chat** | Nachrichtentypen IMAGE/FILE sind definiert, aber Upload-Logik fehlt | Mittel |
 | **Vertretung/Tausch im Frontend** | Backend-Endpunkte existieren, aber kein UI dafuer | Mittel |
-| **Push-Benachrichtigungen** | Firebase Cloud Messaging ist geplant aber nicht implementiert | Mittel |
-| **Abteilungsfilter fuer Leitung** | Manager sehen aktuell alle Mitarbeiter statt nur ihre Abteilung | Niedrig |
 | **Admin-Dashboard** | Zeigt nur Basis-Kennzahlen, koennte um Diagramme erweitert werden | Niedrig |
 | **App.css** | Enthaelt ungenutzten Vite-Template-Code | Niedrig |
 | **Hardcodierte WebSocket-URL** | Chat verbindet sich fest mit `127.0.0.1:8000` | Niedrig |

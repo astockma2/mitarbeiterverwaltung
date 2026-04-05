@@ -1,7 +1,7 @@
 # Benutzerhandbuch — Mitarbeiterverwaltung (MVA)
 ### Ilm-Kreis-Kliniken
 
-**Version:** 1.0 · **Stand:** April 2026  
+**Version:** 1.5.0 · **Stand:** April 2026  
 **Zielgruppe:** Alle Mitarbeiterinnen und Mitarbeiter der Ilm-Kreis-Kliniken
 
 ---
@@ -15,6 +15,7 @@
 5. [Nachrichten / Chat](#5-nachrichten--chat)
 6. [Für Abteilungsleiter](#6-für-abteilungsleiter)
 7. [Für HR und Administration](#7-für-hr-und-administration)
+8. [Neu in Version 1.5.0](#8-neu-in-version-150)
 
 ---
 
@@ -33,6 +34,8 @@
 
 > **Hinweis:** Ihr Benutzername entspricht Ihrem Windows-Anmeldekonto im Krankenhaus. Wenden Sie sich bei Fragen an die IT-Abteilung.
 
+> **Hinweis Kontosperrung:** Nach **5 aufeinanderfolgenden Fehlanmeldungen** wird Ihr Konto automatisch für **15 Minuten** gesperrt. Sie erhalten eine entsprechende Meldung. Bitte warten Sie die Sperrzeit ab — danach können Sie sich wieder anmelden. Bei anhaltenden Problemen wenden Sie sich an die IT-Abteilung.
+
 ### 1.2 Anmelden in der Android-App
 
 1. Installieren Sie die App **„MVA Ilm-Kreis-Kliniken"** auf Ihrem Android-Gerät.
@@ -41,6 +44,10 @@
 4. Tippen Sie auf **„Anmelden"**.
 
 [Screenshot: App-Anmeldebildschirm]
+
+**Biometrie-Login (Fingerabdruck):** Nach dem ersten erfolgreichen Anmelden fragt die App, ob Sie den Fingerabdruck-Login aktivieren möchten. Tippen Sie auf **„Ja"**, um künftig schnell und ohne Passworteingabe über Ihren Fingerabdruck anzumelden. Der Fingerabdruck-Login ist optional und kann jederzeit in den App-Einstellungen deaktiviert werden.
+
+**Automatische App-Aktualisierung:** Beim Start prüft die App, ob eine neue Version verfügbar ist. Falls ja, werden Sie darüber informiert und können das Update direkt aus der App heraus herunterladen und installieren.
 
 ### 1.3 Passwort zurücksetzen
 
@@ -246,6 +253,8 @@ Wenn Sie bei einer freien Schicht einspringen können, wenden Sie sich direkt an
 
 [Screenshot: Chat-Ansicht mit geöffnetem Gespräch und Texteingabe]
 
+> **Hinweis:** Nachrichten können maximal **10.000 Zeichen** lang sein.
+
 ### 5.2 Bestehende Gespräche öffnen
 
 In der linken Spalte sehen Sie alle Ihre Gespräche. Gespräche mit ungelesenen Nachrichten werden **fett** angezeigt und zeigen eine blaue Zahl (Anzahl ungelesener Nachrichten).
@@ -260,11 +269,55 @@ Ein grüner Punkt neben dem Namen bedeutet: Der Mitarbeiter ist gerade online.
 
 [Screenshot: Mitarbeiterliste nach Abteilungen gruppiert]
 
-### 5.4 Gruppenchat / Abteilungs-Chat
+> **Datenschutz (DSGVO):** Mitarbeiter sehen in der Auswahl nur Kolleginnen und Kollegen der eigenen Abteilung. Abteilungsleiter und HR sehen alle Mitarbeiter.
 
-Bestehende Gruppengespräche (z. B. der Abteilungs-Chat) erscheinen ebenfalls in Ihrer Gesprächsliste. Klicken Sie darauf, um am Gespräch teilzunehmen.
+### 5.4 Gruppenchat
 
-> **Hinweis:** Neue Gruppenkonversationen werden derzeit von der Abteilungsleitung oder der IT eingerichtet.
+Neben Einzelgesprächen unterstützt der Chat auch **Gruppenkonversationen** mit mehreren Teilnehmern gleichzeitig — z. B. für Teambesprechungen oder den Abteilungs-Chat.
+
+Bestehende Gruppenkonversationen erscheinen in Ihrer Gesprächsliste mit einem **Gruppen-Symbol**. Klicken Sie darauf, um am Gespräch teilzunehmen und Nachrichten zu senden.
+
+> **Hinweis:** Neue Gruppenkonversationen werden von der Abteilungsleitung oder der IT eingerichtet. Sprechen Sie diese an, wenn Sie eine neue Gruppe benötigen.
+
+### 5.5 Dateiversand
+
+Im Chat können Sie Dateien direkt an Ihre Gesprächspartner senden (z. B. Dokumente, Bilder):
+
+**Datei senden:**
+
+1. Öffnen Sie ein Gespräch.
+2. Klicken Sie auf das **Büroklammer-Symbol** (Anhang) neben dem Texteingabefeld.
+3. Wählen Sie die gewünschte Datei von Ihrem Gerät aus.
+4. Die Datei wird hochgeladen und als Anhang in der Unterhaltung angezeigt.
+
+**Datei empfangen / herunterladen:**
+
+Empfangene Dateianhänge erscheinen direkt in der Konversation. Klicken Sie auf den Dateinamen oder das Download-Symbol, um die Datei auf Ihr Gerät zu speichern.
+
+### 5.6 Push-Benachrichtigungen
+
+Wenn Sie eine neue Nachricht erhalten, werden Sie durch eine **Push-Benachrichtigung** informiert — auch wenn Sie den Chat-Bereich gerade nicht geöffnet haben:
+
+- **Im Browser:** Ein roter Zähler erscheint auf dem „Nachrichten"-Symbol in der Seitenleiste.
+- **In der App:** Sie erhalten eine Benachrichtigung auf Ihrem Android-Gerät (sofern Benachrichtigungen für die App erlaubt sind).
+
+### 5.7 KI-Support-Bot (MVA Support)
+
+In Ihrer Nachrichtenliste finden Sie den Kontakt **„MVA Support"** — das ist der KI-Assistent der Mitarbeiterverwaltung. Er beantwortet häufige Fragen rund um die Anwendung.
+
+**So nutzen Sie den Support-Bot:**
+
+1. Klicken Sie in der Seitenleiste auf **„Nachrichten"**.
+2. Wählen Sie in der Gesprächsliste **„MVA Support"** aus (oder suchen Sie danach).
+3. Schreiben Sie Ihre Frage in das Textfeld und drücken Sie **Enter**.
+4. Der Bot antwortet automatisch innerhalb weniger Sekunden.
+
+**Beispielfragen:**
+- „Wie beantrage ich Urlaub?"
+- „Wie stempel ich aus?"
+- „Was bedeutet der Status Beantragt?"
+
+> **Hinweis:** Der Support-Bot beantwortet allgemeine Fragen zur Bedienung der Anwendung. Für persönliche Anliegen (z. B. Zeitkorrekturen, Passwort) wenden Sie sich weiterhin an Ihre Abteilungsleitung oder die IT.
 
 ---
 
@@ -407,7 +460,7 @@ Unter **„Auswertungen"** stehen vier Auswertungstypen zur Verfügung:
 ## Häufige Fragen
 
 **Ich kann mich nicht anmelden — was tun?**  
-Prüfen Sie, ob Ihr Benutzername korrekt eingetragen ist (kein „@" oder Domain-Anteil). Wenden Sie sich bei anhaltenden Problemen an die IT-Abteilung.
+Prüfen Sie, ob Ihr Benutzername korrekt eingetragen ist (kein „@" oder Domain-Anteil). Falls Sie mehrfach ein falsches Passwort eingegeben haben, kann Ihr Konto für **15 Minuten gesperrt** sein — bitte warten Sie diese Zeit ab. Bei anhaltenden Problemen wenden Sie sich an die IT-Abteilung.
 
 **Ich habe vergessen einzustempeln — was jetzt?**  
 Wenden Sie sich an Ihre Abteilungsleitung oder die Personalabteilung. Diese können eine Zeitkorrektur eintragen.
@@ -420,6 +473,33 @@ Der Dienstplan wurde möglicherweise noch nicht veröffentlicht. Sprechen Sie Ih
 
 **Wie erkenne ich, ob meine Nachricht angekommen ist?**  
 Nachrichten, die Sie senden, erscheinen sofort in Ihrer Ansicht auf der rechten Seite (blauer Hintergrund). Eine separate Lesebestätigung ist derzeit nicht verfügbar.
+
+**Ich sehe im Chat nicht alle Mitarbeiter — ist das normal?**  
+Ja. Aus Datenschutzgründen (DSGVO) können reguläre Mitarbeiter nur Kolleginnen und Kollegen der eigenen Abteilung auswählen. Abteilungsleiter und HR sehen alle Mitarbeiter.
+
+**Kann ich dem Support-Bot Fragen stellen?**  
+Ja! Schreiben Sie einfach an **„MVA Support"** im Chat. Der KI-Assistent beantwortet allgemeine Bedienungsfragen rund um die Anwendung (siehe Abschnitt 5.7).
+
+**Kann ich Dateien über den Chat verschicken?**  
+Ja, über das Büroklammer-Symbol im Chatfenster können Sie Dateien anhängen und versenden (siehe Abschnitt 5.5).
+
+---
+
+## 8. Neu in Version 1.5.0
+
+Folgende Funktionen wurden in Version 1.5.0 eingeführt:
+
+| Funktion | Beschreibung |
+|---|---|
+| **Kontosperrung** | Nach 5 Fehlanmeldungen wird das Konto für 15 Min. gesperrt (Schutz vor unbefugtem Zugriff) |
+| **KI-Support-Bot** | „MVA Support" im Chat beantwortet Bedienungsfragen automatisch |
+| **Gruppenchat** | Mehrere Teilnehmer können gemeinsam in einer Konversation schreiben |
+| **Dateiversand** | Dateien können im Chat hochgeladen und heruntergeladen werden |
+| **Push-Benachrichtigungen** | Benachrichtigungen bei neuen Chat-Nachrichten (Browser & App) |
+| **DSGVO-Mitarbeiterliste** | Mitarbeiter sehen nur ihre eigene Abteilung (datenschutzkonform) |
+| **Biometrie-Login** | Fingerabdruck-Login in der Android-App nach erstem Anmelden |
+| **App-Aktualisierung** | Die App prüft beim Start automatisch auf neue Versionen |
+| **Handbuch auf Landingpage** | Das Benutzerhandbuch ist auf der Webseite abrufbar |
 
 ---
 
