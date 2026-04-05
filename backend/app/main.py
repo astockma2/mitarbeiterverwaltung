@@ -3,9 +3,10 @@ from contextlib import asynccontextmanager
 
 import traceback
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from pathlib import Path
 
 from app.api.auth import router as auth_router
 from app.api.employees import router as employees_router
@@ -92,6 +93,15 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok", "version": "1.5.0"}
+
+
+@app.get("/api/v1/handbuch", response_class=FileResponse)
+async def get_handbuch():
+    """Benutzerhandbuch als Markdown-Datei herunterladen (öffentlich zugänglich)."""
+    pfad = Path(__file__).resolve().parent.parent / "docs" / "benutzerhandbuch.md"
+    if not pfad.exists():
+        raise HTTPException(status_code=404, detail="Benutzerhandbuch nicht gefunden")
+    return FileResponse(str(pfad), media_type="text/markdown; charset=utf-8", filename="benutzerhandbuch.md")
 
 
 @app.get("/api/v1/app/version")

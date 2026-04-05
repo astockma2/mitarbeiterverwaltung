@@ -102,6 +102,15 @@ export default function Login() {
 
         <div style={{ textAlign: 'center', marginTop: 20, fontSize: 11, color: '#94a3b8', letterSpacing: 0.5 }}>
           Powered by <strong>IKK IT</strong>
+          {' · '}
+          <a
+            href="/api/v1/handbuch"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#94a3b8', textDecoration: 'underline' }}
+          >
+            Benutzerhandbuch
+          </a>
         </div>
       </div>
     </div>
