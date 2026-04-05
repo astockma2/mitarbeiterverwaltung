@@ -2,8 +2,12 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# System-Dependencies + Node.js 22 (für Claude CLI Support-Bot)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev gcc \
+    libpq-dev gcc curl \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && npm install -g @anthropic-ai/claude-code \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
