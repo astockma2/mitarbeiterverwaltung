@@ -2,6 +2,8 @@
 
 import asyncio
 import logging
+import os
+import shutil
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -31,6 +33,9 @@ Die Mitarbeiterverwaltung (MVA) ermoeglicht:
 Bei weiteren Fragen wenden Sie sich bitte an die IT-Abteilung.
 """
 
+# Claude CLI-Pfad: über Umgebungsvariable konfigurierbar, sonst PATH-Suche
+_CLAUDE_CLI_PATH = os.environ.get("CLAUDE_CLI_PATH") or shutil.which("claude") or "claude"
+
 
 def _lade_handbuch() -> str:
     try:
@@ -42,7 +47,7 @@ def _lade_handbuch() -> str:
 
 
 async def get_bot_response(user_message: str, conversation_history: list[dict]) -> str:
-    """Erzeugt eine Bot-Antwort ueber Claude Code CLI (nutzt Claude Max Abo)."""
+    """Erzeugt eine Bot-Antwort über Claude Code CLI (nutzt Claude Max Abo)."""
     try:
         # Konversations-Kontext aufbauen
         context_parts = []
@@ -58,8 +63,9 @@ async def get_bot_response(user_message: str, conversation_history: list[dict]) 
         prompt += f"\nBenutzer: {user_message}\n\nAntworte als MVA Support-Assistent:"
 
         # Claude CLI aufrufen
+        log.debug("Rufe Claude CLI auf: %s", _CLAUDE_CLI_PATH)
         proc = await asyncio.create_subprocess_exec(
-            "claude", "--print", "-p", prompt,
+            _CLAUDE_CLI_PATH, "--print", "-p", prompt,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             stdin=asyncio.subprocess.DEVNULL,
@@ -70,18 +76,28 @@ async def get_bot_response(user_message: str, conversation_history: list[dict]) 
             err = stderr.decode().strip()
             log.error("Claude CLI Fehler (exit %d): %s", proc.returncode, err)
             return (
-                "Der KI-Support ist momentan nicht verfuegbar. "
+                "Der KI-Support ist momentan nicht verfügbar. "
                 "Bitte wenden Sie sich an die IT-Abteilung."
             )
 
         return stdout.decode().strip()
 
+    except FileNotFoundError:
+        log.error(
+            "Claude CLI nicht gefunden unter '%s'. "
+            "Bitte Umgebungsvariable CLAUDE_CLI_PATH setzen oder claude im Container-PATH bereitstellen.",
+            _CLAUDE_CLI_PATH,
+        )
+        return (
+            "Der KI-Support ist momentan nicht verfügbar. "
+            "Bitte wenden Sie sich an die IT-Abteilung."
+        )
     except asyncio.TimeoutError:
         log.error("Claude CLI Timeout nach 30s")
         return "Die Antwort hat zu lange gedauert. Bitte versuchen Sie es erneut."
     except Exception as e:
-        log.error("Fehler bei Bot-Antwort: %s", e)
+        log.error("Fehler bei Bot-Antwort: %s", e, exc_info=True)
         return (
-            "Es ist ein Fehler aufgetreten. Bitte versuchen Sie es spaeter erneut "
+            "Es ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut "
             "oder wenden Sie sich an die IT-Abteilung."
         )
