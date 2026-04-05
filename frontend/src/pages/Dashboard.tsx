@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Users, Clock, CalendarDays, TrendingUp } from 'lucide-react';
+import { Users, Clock, CalendarDays, TrendingUp, Sparkles } from 'lucide-react';
 import Card, { StatCard } from '../components/Card';
 import { getDashboard, getClockStatus, getMonthlySummary, getVacationBalance } from '../services/api';
 
@@ -95,6 +95,21 @@ export default function Dashboard({ user, isHR }: Props) {
           )}
         </Card>
       )}
+
+      {/* Was ist neu in v1.5.0 */}
+      <Card title="" style={{ marginBottom: 24, background: 'linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)', border: '1px solid #bfdbfe' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <Sparkles size={18} style={{ color: '#3b82f6' }} />
+          <span style={{ fontWeight: 700, fontSize: 15, color: '#1e40af' }}>Neu in Version 1.5.0</span>
+        </div>
+        <ul style={{ margin: 0, padding: '0 0 0 20px', fontSize: 13, color: '#374151', lineHeight: 1.8 }}>
+          <li>Kontosperrung nach 5 Fehlanmeldungen (Sicherheit)</li>
+          <li>KI-Support-Bot im Chat — einfach „MVA Support" anschreiben</li>
+          <li>Gruppenchats & Dateianhänge im Nachrichtenbereich</li>
+          <li>Biometrie-Login (Fingerabdruck) in der Android-App</li>
+          <li>Push-Benachrichtigungen für neue Nachrichten</li>
+        </ul>
+      </Card>
 
       {/* HR Dashboard */}
       {isHR && stats && (

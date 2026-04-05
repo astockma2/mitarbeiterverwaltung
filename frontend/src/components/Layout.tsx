@@ -1,7 +1,7 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import {
   Users, Clock, Calendar, BarChart3, Building2, LogOut,
-  ClipboardList, CalendarDays, Home, MessageCircle, Lock, TicketCheck
+  ClipboardList, CalendarDays, Home, MessageCircle, Lock, TicketCheck, BookOpen
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -86,6 +86,22 @@ export default function Layout({ user, isManager, isHR, onLogout }: LayoutProps)
             );
           })}
         </nav>
+
+        <div style={{ padding: '8px 16px', borderTop: '1px solid #334155' }}>
+          <a
+            href="/api/v1/handbuch"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '8px 0', color: '#94a3b8',
+              textDecoration: 'none', fontSize: 14,
+            }}
+          >
+            <BookOpen size={18} />
+            Benutzerhandbuch
+          </a>
+        </div>
 
         <div style={{ padding: 16, borderTop: '1px solid #334155' }}>
           <div style={{ fontSize: 13, color: '#fff', fontWeight: 500 }}>{user?.name}</div>
