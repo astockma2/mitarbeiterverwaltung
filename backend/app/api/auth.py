@@ -74,11 +74,11 @@ async def login(request: LoginRequest, http_request: Request, response: Response
                 employee.role = UserRole(ad_role)
 
         elif settings.app_env == "production":
-            # Produktion ohne AD: Login ueber Personalnummer + bcrypt-Passwort
+            # Produktion ohne AD: Login ueber ad_username + bcrypt-Passwort
             import bcrypt
 
             result = await db.execute(
-                select(Employee).where(Employee.personnel_number == request.username)
+                select(Employee).where(Employee.ad_username == request.username)
             )
             employee = result.scalar_one_or_none()
 
