@@ -1,5 +1,6 @@
-"""KI-Support-Bot basierend auf Gemini API."""
+"""KI-Support-Bot basierend auf Gemi API-Proxy (kostenlos via OpenRouter/Qwen)."""
 
+import json
 import logging
 import os
 from pathlib import Path
@@ -33,9 +34,8 @@ Die Mitarbeiterverwaltung (MVA) ermoeglicht:
 Bei weiteren Fragen wenden Sie sich bitte an die IT-Abteilung.
 """
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_MODEL = "gemini-2.5-flash"
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+GEMI_API_URL = os.environ.get("GEMI_API_URL", "http://host.docker.internal:8085")
+GEMI_API_KEY = os.environ.get("GEMI_API_KEY", "gemi2026")
 
 
 def _lade_handbuch() -> str:
@@ -48,57 +48,54 @@ def _lade_handbuch() -> str:
 
 
 async def get_bot_response(user_message: str, conversation_history: list[dict]) -> str:
-    """Erzeugt eine Bot-Antwort ueber die Gemini API."""
-    if not GEMINI_API_KEY:
-        log.error("GEMINI_API_KEY nicht gesetzt")
-        return (
-            "Der KI-Support ist momentan nicht verfügbar. "
-            "Bitte wenden Sie sich an die IT-Abteilung."
-        )
-
+    """Erzeugt eine Bot-Antwort ueber den Gemi API-Proxy (kostenlos)."""
     try:
-        # Konversations-Kontext aufbauen
-        contents = []
-
-        # System-Instruktion als erster User-Turn
         system_text = SYSTEM_PROMPT.format(handbuch_inhalt=_lade_handbuch())
 
-        # Bisherigen Chatverlauf einfuegen
+        # Messages aufbauen: System + History + aktuelle Frage
+        messages = [{"role": "system", "content": system_text}]
+
         for msg in conversation_history[-10:]:
-            role = "model" if msg.get("is_bot") else "user"
-            contents.append({"role": role, "parts": [{"text": msg["content"]}]})
+            role = "assistant" if msg.get("is_bot") else "user"
+            messages.append({"role": role, "content": msg["content"]})
 
-        # Aktuelle Nachricht
-        contents.append({"role": "user", "parts": [{"text": user_message}]})
+        messages.append({"role": "user", "content": user_message})
 
-        payload = {
-            "system_instruction": {"parts": [{"text": system_text}]},
-            "contents": contents,
-            "generationConfig": {
-                "maxOutputTokens": 1024,
-                "temperature": 0.7,
-            },
-        }
-
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(10.0, read=60.0)) as client:
             resp = await client.post(
-                GEMINI_URL,
-                params={"key": GEMINI_API_KEY},
-                json=payload,
+                f"{GEMI_API_URL}/api/chat",
+                headers={
+                    "Authorization": f"Bearer {GEMI_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={"messages": messages, "stream": True},
             )
 
         if resp.status_code != 200:
-            log.error("Gemini API Fehler (HTTP %d): %s", resp.status_code, resp.text[:500])
+            log.error("Gemi API Fehler (HTTP %d): %s", resp.status_code, resp.text[:500])
             return (
                 "Der KI-Support ist momentan nicht verfügbar. "
                 "Bitte wenden Sie sich an die IT-Abteilung."
             )
 
-        data = resp.json()
-        return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        # Streaming NDJSON Response zusammenbauen
+        answer_parts = []
+        for line in resp.text.strip().split("\n"):
+            if not line.strip():
+                continue
+            try:
+                chunk = json.loads(line)
+                content = chunk.get("message", {}).get("content", "")
+                if content:
+                    answer_parts.append(content)
+            except json.JSONDecodeError:
+                continue
+
+        answer = "".join(answer_parts).strip()
+        return answer if answer else "Entschuldigung, ich konnte keine Antwort generieren."
 
     except httpx.TimeoutException:
-        log.error("Gemini API Timeout nach 30s")
+        log.error("Gemi API Timeout")
         return "Die Antwort hat zu lange gedauert. Bitte versuchen Sie es erneut."
     except Exception as e:
         log.error("Fehler bei Bot-Antwort: %s", e, exc_info=True)
