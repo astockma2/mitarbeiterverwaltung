@@ -40,7 +40,7 @@ async def login(request: LoginRequest, http_request: Request, response: Response
 
     try:
         if settings.ad_enabled:
-            # Produktion: AD-Authentifizierung
+            # AD-Authentifizierung
             from app.auth.ldap import authenticate_user, determine_role_from_groups
             from app.models.employee import UserRole
 
@@ -72,6 +72,38 @@ async def login(request: LoginRequest, http_request: Request, response: Response
             ad_role = determine_role_from_groups(ad_user.groups)
             if ad_role != employee.role.value:
                 employee.role = UserRole(ad_role)
+
+        elif settings.app_env == "production":
+            # Produktion ohne AD: Login ueber Personalnummer + bcrypt-Passwort
+            import bcrypt
+
+            result = await db.execute(
+                select(Employee).where(Employee.personnel_number == request.username)
+            )
+            employee = result.scalar_one_or_none()
+
+            if employee is None:
+                await record_failed_attempt(client_ip)
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Benutzername oder Passwort falsch",
+                )
+
+            if not employee.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Benutzerkonto deaktiviert",
+                )
+
+            if not employee.password_hash or not bcrypt.checkpw(
+                request.password.encode("utf-8"),
+                employee.password_hash.encode("utf-8"),
+            ):
+                await record_failed_attempt(client_ip)
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Benutzername oder Passwort falsch",
+                )
 
         else:
             # Entwicklung: Login ueber AD-Username, Passwort = "dev"
