@@ -62,25 +62,35 @@ async def get_bot_response(user_message: str, conversation_history: list[dict]) 
             prompt += f"\n\nBisheriger Chatverlauf:\n{context}\n"
         prompt += f"\nBenutzer: {user_message}\n\nAntworte als MVA Support-Assistent:"
 
-        # Claude CLI aufrufen
-        log.debug("Rufe Claude CLI auf: %s", _CLAUDE_CLI_PATH)
+        # Claude CLI aufrufen (--dangerously-skip-permissions für nicht-interaktiven Container-Betrieb)
+        log.info("Rufe Claude CLI auf: %s", _CLAUDE_CLI_PATH)
         proc = await asyncio.create_subprocess_exec(
-            _CLAUDE_CLI_PATH, "--print", "-p", prompt,
+            _CLAUDE_CLI_PATH, "--print", "--dangerously-skip-permissions", "-p", prompt,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             stdin=asyncio.subprocess.DEVNULL,
         )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=60)
 
         if proc.returncode != 0:
             err = stderr.decode().strip()
-            log.error("Claude CLI Fehler (exit %d): %s", proc.returncode, err)
+            log.error(
+                "Claude CLI Fehler (exit %d) bei '%s': %s",
+                proc.returncode, _CLAUDE_CLI_PATH, err or "(kein stderr)",
+            )
             return (
                 "Der KI-Support ist momentan nicht verfügbar. "
                 "Bitte wenden Sie sich an die IT-Abteilung."
             )
 
-        return stdout.decode().strip()
+        antwort = stdout.decode().strip()
+        if not antwort:
+            log.warning("Claude CLI lieferte leere Antwort (exit 0), stderr: %s", stderr.decode().strip())
+            return (
+                "Der KI-Support ist momentan nicht verfügbar. "
+                "Bitte wenden Sie sich an die IT-Abteilung."
+            )
+        return antwort
 
     except FileNotFoundError:
         log.error(
@@ -93,7 +103,7 @@ async def get_bot_response(user_message: str, conversation_history: list[dict]) 
             "Bitte wenden Sie sich an die IT-Abteilung."
         )
     except asyncio.TimeoutError:
-        log.error("Claude CLI Timeout nach 30s")
+        log.error("Claude CLI Timeout nach 60s")
         return "Die Antwort hat zu lange gedauert. Bitte versuchen Sie es erneut."
     except Exception as e:
         log.error("Fehler bei Bot-Antwort: %s", e, exc_info=True)
