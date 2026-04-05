@@ -1,7 +1,7 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.schemas import LoginRequest, RefreshRequest, TokenResponse
@@ -74,11 +74,16 @@ async def login(request: LoginRequest, http_request: Request, response: Response
                 employee.role = UserRole(ad_role)
 
         elif settings.app_env == "production":
-            # Produktion ohne AD: Login ueber ad_username + bcrypt-Passwort
+            # Produktion ohne AD: Login über ad_username ODER Personalnummer + bcrypt-Passwort
             import bcrypt
 
             result = await db.execute(
-                select(Employee).where(Employee.ad_username == request.username)
+                select(Employee).where(
+                    or_(
+                        Employee.ad_username == request.username,
+                        Employee.personnel_number == request.username,
+                    )
+                )
             )
             employee = result.scalar_one_or_none()
 

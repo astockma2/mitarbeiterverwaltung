@@ -1,6 +1,8 @@
-"""Tests für das Rate-Limiting beim Login-Endpoint (Issue #61)."""
+"""Tests für das Rate-Limiting beim Login-Endpoint (Issue #61, #72)."""
 
 import pytest
+import yaml
+import os
 from httpx import ASGITransport, AsyncClient
 from unittest.mock import patch, AsyncMock
 
@@ -154,3 +156,25 @@ async def test_reset_failed_attempts_hebt_sperre_auf():
 
     blocked, _ = await rl.is_rate_limited("test-ip-3")
     assert not blocked
+
+
+def test_prod_docker_compose_redis_url_korrekt():
+    """Stellt sicher, dass docker-compose.prod.yml REDIS_URL mit Service-Namen 'redis' setzt.
+
+    Hintergrund (Issue #72): Der Default redis://localhost:6379/0 funktioniert im
+    Docker-Netzwerk nicht — Redis ist dort unter dem Service-Namen 'redis' erreichbar.
+    """
+    compose_path = os.path.join(
+        os.path.dirname(__file__), "..", "..", "docker-compose.prod.yml"
+    )
+    with open(compose_path) as f:
+        compose = yaml.safe_load(f)
+
+    backend_env = compose["services"]["backend"]["environment"]
+    redis_url = backend_env.get("REDIS_URL", "")
+
+    assert redis_url, "REDIS_URL muss in docker-compose.prod.yml gesetzt sein"
+    assert redis_url.startswith("redis://redis"), (
+        f"REDIS_URL muss 'redis://redis' als Hostnamen nutzen (Docker-Servicename), "
+        f"nicht 'localhost'. Aktuell: {redis_url}"
+    )

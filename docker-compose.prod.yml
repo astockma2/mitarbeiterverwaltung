@@ -35,6 +35,8 @@ services:
       - .env
     environment:
       TZ: Europe/Berlin
+      # Redis-URL: Service-Name im Docker-Netzwerk ist "redis", nicht "localhost"
+      REDIS_URL: redis://redis:6379/0
       # Pfad zur Claude CLI-Binary im Container (muss zu den Volume-Mounts passen)
       # Beispiel: CLAUDE_CLI_PATH=/root/.nvm/versions/node/v22.14.0/bin/claude
       CLAUDE_CLI_PATH: ${CLAUDE_CLI_PATH:-claude}
