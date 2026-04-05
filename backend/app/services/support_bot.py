@@ -1,10 +1,10 @@
-"""KI-Support-Bot basierend auf Claude Code CLI."""
+"""KI-Support-Bot basierend auf Gemini API."""
 
-import asyncio
 import logging
 import os
-import shutil
 from pathlib import Path
+
+import httpx
 
 log = logging.getLogger(__name__)
 
@@ -33,8 +33,9 @@ Die Mitarbeiterverwaltung (MVA) ermoeglicht:
 Bei weiteren Fragen wenden Sie sich bitte an die IT-Abteilung.
 """
 
-# Claude CLI-Pfad: über Umgebungsvariable konfigurierbar, sonst PATH-Suche
-_CLAUDE_CLI_PATH = os.environ.get("CLAUDE_CLI_PATH") or shutil.which("claude") or "claude"
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 
 
 def _lade_handbuch() -> str:
@@ -47,53 +48,57 @@ def _lade_handbuch() -> str:
 
 
 async def get_bot_response(user_message: str, conversation_history: list[dict]) -> str:
-    """Erzeugt eine Bot-Antwort über Claude Code CLI (nutzt Claude Max Abo)."""
+    """Erzeugt eine Bot-Antwort ueber die Gemini API."""
+    if not GEMINI_API_KEY:
+        log.error("GEMINI_API_KEY nicht gesetzt")
+        return (
+            "Der KI-Support ist momentan nicht verfügbar. "
+            "Bitte wenden Sie sich an die IT-Abteilung."
+        )
+
     try:
         # Konversations-Kontext aufbauen
-        context_parts = []
+        contents = []
+
+        # System-Instruktion als erster User-Turn
+        system_text = SYSTEM_PROMPT.format(handbuch_inhalt=_lade_handbuch())
+
+        # Bisherigen Chatverlauf einfuegen
         for msg in conversation_history[-10:]:
-            role = "Assistent" if msg.get("is_bot") else "Benutzer"
-            context_parts.append(f"{role}: {msg['content']}")
+            role = "model" if msg.get("is_bot") else "user"
+            contents.append({"role": role, "parts": [{"text": msg["content"]}]})
 
-        context = "\n".join(context_parts)
+        # Aktuelle Nachricht
+        contents.append({"role": "user", "parts": [{"text": user_message}]})
 
-        prompt = SYSTEM_PROMPT.format(handbuch_inhalt=_lade_handbuch())
-        if context:
-            prompt += f"\n\nBisheriger Chatverlauf:\n{context}\n"
-        prompt += f"\nBenutzer: {user_message}\n\nAntworte als MVA Support-Assistent:"
+        payload = {
+            "system_instruction": {"parts": [{"text": system_text}]},
+            "contents": contents,
+            "generationConfig": {
+                "maxOutputTokens": 1024,
+                "temperature": 0.7,
+            },
+        }
 
-        # Claude CLI aufrufen
-        log.debug("Rufe Claude CLI auf: %s", _CLAUDE_CLI_PATH)
-        proc = await asyncio.create_subprocess_exec(
-            _CLAUDE_CLI_PATH, "--print", "-p", prompt,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            stdin=asyncio.subprocess.DEVNULL,
-        )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                GEMINI_URL,
+                params={"key": GEMINI_API_KEY},
+                json=payload,
+            )
 
-        if proc.returncode != 0:
-            err = stderr.decode().strip()
-            log.error("Claude CLI Fehler (exit %d): %s", proc.returncode, err)
+        if resp.status_code != 200:
+            log.error("Gemini API Fehler (HTTP %d): %s", resp.status_code, resp.text[:500])
             return (
                 "Der KI-Support ist momentan nicht verfügbar. "
                 "Bitte wenden Sie sich an die IT-Abteilung."
             )
 
-        return stdout.decode().strip()
+        data = resp.json()
+        return data["candidates"][0]["content"]["parts"][0]["text"].strip()
 
-    except FileNotFoundError:
-        log.error(
-            "Claude CLI nicht gefunden unter '%s'. "
-            "Bitte Umgebungsvariable CLAUDE_CLI_PATH setzen oder claude im Container-PATH bereitstellen.",
-            _CLAUDE_CLI_PATH,
-        )
-        return (
-            "Der KI-Support ist momentan nicht verfügbar. "
-            "Bitte wenden Sie sich an die IT-Abteilung."
-        )
-    except asyncio.TimeoutError:
-        log.error("Claude CLI Timeout nach 30s")
+    except httpx.TimeoutException:
+        log.error("Gemini API Timeout nach 30s")
         return "Die Antwort hat zu lange gedauert. Bitte versuchen Sie es erneut."
     except Exception as e:
         log.error("Fehler bei Bot-Antwort: %s", e, exc_info=True)
