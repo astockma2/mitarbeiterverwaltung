@@ -31,6 +31,7 @@ class Employee(Base):
     ad_username: Mapped[Optional[str]] = mapped_column(
         String(100), unique=True, index=True
     )
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Persoenliche Daten
     first_name: Mapped[str] = mapped_column(String(100))
