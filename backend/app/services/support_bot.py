@@ -1,4 +1,4 @@
-"""KI-Support-Bot basierend auf Gemi API-Proxy (kostenlos via OpenRouter/Qwen)."""
+"""KI-Support-Bot basierend auf Claudi API-Proxy (Claude Opus 4.6)."""
 
 import json
 import logging
@@ -48,7 +48,7 @@ def _lade_handbuch() -> str:
 
 
 async def get_bot_response(user_message: str, conversation_history: list[dict]) -> str:
-    """Erzeugt eine Bot-Antwort ueber den Gemi API-Proxy (kostenlos)."""
+    """Erzeugt eine Bot-Antwort ueber den Claudi API-Proxy (Claude Opus 4.6)."""
     try:
         system_text = SYSTEM_PROMPT.format(handbuch_inhalt=_lade_handbuch())
 
@@ -72,7 +72,7 @@ async def get_bot_response(user_message: str, conversation_history: list[dict]) 
             )
 
         if resp.status_code != 200:
-            log.error("Gemi API Fehler (HTTP %d): %s", resp.status_code, resp.text[:500])
+            log.error("Claudi API Fehler (HTTP %d): %s", resp.status_code, resp.text[:500])
             return (
                 "Der KI-Support ist momentan nicht verfügbar. "
                 "Bitte wenden Sie sich an die IT-Abteilung."
@@ -95,7 +95,7 @@ async def get_bot_response(user_message: str, conversation_history: list[dict]) 
         return answer if answer else "Entschuldigung, ich konnte keine Antwort generieren."
 
     except httpx.TimeoutException:
-        log.error("Gemi API Timeout")
+        log.error("Claudi API Timeout")
         return "Die Antwort hat zu lange gedauert. Bitte versuchen Sie es erneut."
     except Exception as e:
         log.error("Fehler bei Bot-Antwort: %s", e, exc_info=True)
