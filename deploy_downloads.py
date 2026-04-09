@@ -125,12 +125,21 @@ DOWNLOAD_HTML = """<!DOCTYPE html>
         </div>
 
         <div class="card">
-            <h2>Windows / Server Installation</h2>
+            <h2>Installation</h2>
+            <h3 style="font-size:0.95rem;color:var(--accent-light);margin-bottom:8px;">Windows (PowerShell)</h3>
             <span class="badge">Windows</span>
             <span class="badge">PowerShell</span>
             <p>Einzeiler-Installation per PowerShell (installiert Backend + Frontend lokal):</p>
             <div class="install-box">
                 <code>irm https://downloads.c3po42.de/mva/install.ps1 | iex</code>
+                <button onclick="copyCmd(this)">Kopieren</button>
+            </div>
+            <h3 style="font-size:0.95rem;color:var(--accent-light);margin:16px 0 8px;">Linux / Server</h3>
+            <span class="badge">Linux</span>
+            <span class="badge">Docker</span>
+            <p>Einzeiler-Installation per Bash (Docker erforderlich):</p>
+            <div class="install-box">
+                <code>curl -fsSL https://downloads.c3po42.de/mva/install.sh | bash</code>
                 <button onclick="copyCmd(this)">Kopieren</button>
             </div>
         </div>
@@ -216,6 +225,14 @@ if os.path.exists(install_local):
     print(f"  {REMOTE_DIR}/install.ps1")
 else:
     print(f"  WARNUNG: install.ps1 nicht gefunden")
+
+# install.sh hochladen (falls vorhanden)
+install_sh_local = os.path.join(LOCAL_DIR, "install.sh")
+if os.path.exists(install_sh_local):
+    sftp.put(install_sh_local, f"{REMOTE_DIR}/install.sh")
+    print(f"  {REMOTE_DIR}/install.sh")
+else:
+    print(f"  WARNUNG: install.sh nicht gefunden")
 print()
 
 # 3. Nginx reload
