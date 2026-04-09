@@ -42,6 +42,8 @@ services:
       - uploads:/app/uploads
       # Benutzerhandbuch für den Support-Bot
       - ./docs:/app/docs:ro
+      # Produktseite (static/produkt.html)
+      - ./static:/app/static-pages:ro
       # Claude CLI Credentials (für Support-Bot)
       - /root/.claude:/root/.claude:ro
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1

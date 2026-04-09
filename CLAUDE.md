@@ -8,7 +8,7 @@ Kommunikation auf Deutsch.
 
 ## Ueberblick
 
-Mitarbeiterverwaltung fuer IKK Kliniken (~1.000 Mitarbeiter). Zeiterfassung, Schichtplanung, Chat.
+Mitarbeiterverwaltung fuer Kliniken und Gesundheitseinrichtungen. Zeiterfassung, Schichtplanung, Chat.
 Produktion: https://mva.c3po42.de (Hostinger VPS 187.77.84.94).
 
 ## Befehle
@@ -62,7 +62,7 @@ docker compose -f docker-compose.prod.yml logs backend
 - DB-Session: `get_db()` Dependency mit auto-commit/rollback
 - Tabellen werden beim Start via `create_tables()` erstellt (kein Alembic in Entwicklung)
 - Seed: `app_env=development` → `seed.py` (Demo-Daten, Passwort "dev"), `app_env=production` → `seed_prod.py` (bcrypt-Hashes)
-- API-Prefix: `/api/v1`, Docs: `/api/docs`, Health: `/api/health`
+- API-Prefix: `/api/v1`, Docs: `/api/docs`, Redoc: `/api/redoc`, Health: `/api/health` (Version: 1.5.0), App-Version: `/api/v1/app/version`
 
 **Auth-Flow:**
 - Passwort-Verifikation via `bcrypt` direkt (nicht passlib)
@@ -70,9 +70,11 @@ docker compose -f docker-compose.prod.yml logs backend
 - RBAC: ADMIN > HR > DEPARTMENT_MANAGER/TEAM_LEADER > EMPLOYEE
 - AD optional (`ad_enabled`), in Produktion deaktiviert
 
-**Router:** auth, employees, departments, admin, time_tracking, absences, shifts, monthly_closing, chat, reports
+**Router:** auth, employees, departments, admin, time_tracking, absences, shifts, monthly_closing, chat, reports, tickets
 
-**Modelle:** Employee (mit password_hash), Department (Hierarchie via parent_id), TimeEntry, Surcharge, Absence, MonthlyClosing, ShiftTemplate/ShiftPlan/ShiftAssignment, Conversation/Message, Qualification, AuditLog
+**Modelle:** Employee (mit password_hash), Department (Hierarchie via parent_id), TimeEntry, Surcharge, Absence, MonthlyClosing, ShiftTemplate/ShiftPlan/ShiftAssignment, Conversation/ConversationMember/Message, Qualification, AuditLog, Ticket (TicketStatus/TicketPriority), CorrectionRequest, ShiftRequirement/CoverageRequest/SwapRequest
+
+**Services:** support_bot.py (Claude CLI), push_notification.py (Firebase Cloud Messaging, Init in Lifespan)
 
 ### Frontend — React 19 + TypeScript + Vite
 

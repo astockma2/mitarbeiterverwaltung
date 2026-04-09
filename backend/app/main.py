@@ -1,11 +1,12 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import traceback
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 
 from app.api.auth import router as auth_router
 from app.api.employees import router as employees_router
@@ -48,7 +49,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     description="Mitarbeiterverwaltung mit Zeiterfassung und Kommunikation",
-    version="0.1.0",
+    version="1.5.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     lifespan=lifespan,
@@ -102,3 +103,39 @@ async def app_version():
         "download_url": "https://mva.c3po42.de/download/app-release.apk",
         "force_update": False,
     }
+
+
+# ============================================================
+# Docs & Produktseite
+# ============================================================
+
+# Im Docker-Container: /app/docs/ (Volume-Mount), lokal: ../docs/
+DOCS_DIR = Path("/app/docs") if Path("/app/docs").exists() else Path(__file__).resolve().parent.parent.parent / "docs"
+STATIC_DIR = Path("/app/static-pages") if Path("/app/static-pages").exists() else Path(__file__).resolve().parent.parent.parent / "static"
+
+
+@app.get("/docs/readme")
+async def get_readme():
+    """README.md als Text ausliefern."""
+    readme = DOCS_DIR / "README.md"
+    if readme.exists():
+        return Response(content=readme.read_text(encoding="utf-8"), media_type="text/markdown; charset=utf-8")
+    return Response(content="# README nicht gefunden", media_type="text/markdown")
+
+
+@app.get("/docs/handbuch")
+async def get_handbuch():
+    """BENUTZERHANDBUCH.md als Text ausliefern."""
+    handbuch = DOCS_DIR / "benutzerhandbuch.md"
+    if handbuch.exists():
+        return Response(content=handbuch.read_text(encoding="utf-8"), media_type="text/markdown; charset=utf-8")
+    return Response(content="# Benutzerhandbuch nicht gefunden", media_type="text/markdown")
+
+
+@app.get("/produkt")
+async def produkt():
+    """Produktseite ausliefern."""
+    produkt_html = STATIC_DIR / "produkt.html"
+    if produkt_html.exists():
+        return FileResponse(str(produkt_html))
+    return Response(content="Produktseite nicht gefunden", status_code=404)

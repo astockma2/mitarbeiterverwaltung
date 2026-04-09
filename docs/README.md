@@ -223,9 +223,11 @@ Die gesamte Konfiguration erfolgt ueber Umgebungsvariablen (`.env`-Datei), verwa
 |---|---|---|
 | **Zeitberechnung** | `time_calculator.py` | Pausenregeln (ArbZG), Zuschlaege (Nacht/Sonntag/Feiertag), Feiertage NRW, Monatssoll |
 | **Schichtvalidierung** | `shift_validator.py` | Max. 10h/Tag, 48h/Woche, 11h Ruhezeit, max. 6 Tage am Stueck, Doppelbelegung |
+| **KI-Support-Bot** | `support_bot.py` | Chat-Bot (Claude Opus 4.6 via Claudi API-Proxy), Benutzerhandbuch als Wissensbasis |
+| **Push-Benachrichtigungen** | `push_notification.py` | Firebase Cloud Messaging (FCM), Geraete-Token-Verwaltung, wird beim Start initialisiert |
 | **Audit** | `audit.py` | Protokolliert alle Aenderungen an Stammdaten (wer, was, wann) |
 | **AD-Sync** | `ad_sync.py` | Synchronisiert Mitarbeiterdaten aus Active Directory |
-| **Demo-Daten** | `seed.py` | Erstellt Abteilungen, Mitarbeiter und Schichtvorlagen beim ersten Start |
+| **Demo-Daten** | `seed.py` / `seed_prod.py` | Erstellt Abteilungen, Mitarbeiter und Schichtvorlagen beim ersten Start |
 
 ---
 
@@ -603,6 +605,8 @@ Vollstaendige interaktive Dokumentation unter `/api/docs` (Swagger UI).
 | GET | `/chat/employees` | Mitarbeiterliste fuer Chat-Erstellung |
 | GET | `/chat/online` | Aktuell online verbundene Benutzer |
 
+**KI-Support-Bot:** Nachrichten an den Bot-User BOT001 ("MVA Support") werden automatisch an den KI-Support-Bot weitergeleitet. Der Bot nutzt Claude Opus 4.6 ueber den Claudi API-Proxy (`host.docker.internal:8085`) und beantwortet Fragen auf Basis des Benutzerhandbuchs (`docs/benutzerhandbuch.md`).
+
 #### Auswertungen (`/reports`)
 
 | Methode | Pfad | Beschreibung |
@@ -612,6 +616,19 @@ Vollstaendige interaktive Dokumentation unter `/api/docs` (Swagger UI).
 | GET | `/reports/surcharge-summary` | Zuschlagsuebersicht (Nacht, Sonntag, Feiertag) |
 | GET | `/reports/absence-statistics` | Abwesenheitsstatistik nach Typ und Monat |
 | GET | `/reports/export-extended` | Erweiterter CSV-Export mit Zuschlaegen |
+
+#### Tickets (`/tickets`)
+
+| Methode | Pfad | Beschreibung |
+|---|---|---|
+| POST | `/tickets` | Neues Support-Ticket erstellen |
+| GET | `/tickets` | Tickets auflisten (ADMIN/HR: alle, Mitarbeiter: eigene) |
+| GET | `/tickets/{id}` | Einzelnes Ticket abrufen |
+| PATCH | `/tickets/{id}` | Ticket bearbeiten (Status, Prioritaet, Zuweisung) |
+| DELETE | `/tickets/{id}` | Ticket schliessen |
+
+**Status:** OPEN, IN_PROGRESS, RESOLVED, CLOSED
+**Prioritaet:** LOW, MEDIUM, HIGH, CRITICAL
 
 #### Admin (`/admin`)
 
@@ -729,7 +746,7 @@ CORS_ORIGINS=https://mitarbeiter.klinik.local
 
 ## 12. Aktueller Projektstand
 
-*Letzte Aktualisierung: 29.03.2026*
+*Letzte Aktualisierung: 09.04.2026*
 
 ### Implementierungsstatus
 
@@ -744,6 +761,9 @@ CORS_ORIGINS=https://mitarbeiter.klinik.local
 | Schichtplanung (Vorlagen, Regeln) | ✅ | ✅ | ✅ (Struktur) | Fertig |
 | Vertretung und Schichttausch | ✅ | — | — | Backend fertig, Frontend ausstehend |
 | Chat (WebSocket + REST) | ✅ | ✅ | ✅ (Struktur) | Fertig |
+| KI-Support-Bot (Chat) | ✅ | ✅ | ✅ | Fertig (Claude Opus 4.6 via Claudi API-Proxy) |
+| Ticketsystem | ✅ | ✅ | — | Fertig |
+| Push-Benachrichtigungen (FCM) | ✅ | — | ✅ | Fertig (Firebase Cloud Messaging) |
 | Monatsabschluss + Loga-Export | ✅ | ✅ | — | Fertig |
 | Auswertungen und Berichte | ✅ | ✅ | — | Fertig |
 | Audit-Protokollierung | ✅ | — | — | Backend fertig |
@@ -859,7 +879,6 @@ stop.bat        # Alles beenden
 | **iOS ohne Code-Signierung** | IPA wird ohne Signierung gebaut — fuer echte Geraete ist ein Apple Developer Account ($99/Jahr) noetig | Niedrig |
 | **Datei-Upload im Chat** | Nachrichtentypen IMAGE/FILE sind definiert, aber Upload-Logik fehlt | Mittel |
 | **Vertretung/Tausch im Frontend** | Backend-Endpunkte existieren, aber kein UI dafuer | Mittel |
-| **Push-Benachrichtigungen** | Firebase Cloud Messaging ist geplant aber nicht implementiert | Mittel |
 | **Abteilungsfilter fuer Leitung** | Manager sehen aktuell alle Mitarbeiter statt nur ihre Abteilung | Niedrig |
 | **Admin-Dashboard** | Zeigt nur Basis-Kennzahlen, koennte um Diagramme erweitert werden | Niedrig |
 | **App.css** | Enthaelt ungenutzten Vite-Template-Code | Niedrig |
