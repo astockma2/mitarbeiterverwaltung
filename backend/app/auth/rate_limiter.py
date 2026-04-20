@@ -32,7 +32,7 @@ async def _get_redis():
         await client.ping()
         return client
     except Exception as e:
-        logger.debug("Redis nicht verfügbar, nutze In-Memory-Fallback: %s", e)
+        logger.warning("Redis nicht verfügbar, nutze In-Memory-Fallback: %s", e)
         return None
 
 
