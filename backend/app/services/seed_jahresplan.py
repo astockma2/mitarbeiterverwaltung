@@ -201,13 +201,18 @@ async def seed_jahresplan_2026() -> None:
             db.add(it_dept)
             await db.flush()
 
-        # Mitarbeiter anlegen falls fehlend
+        # Mitarbeiter anlegen falls fehlend - Match ueber personnel_number ODER ad_username
+        # damit pre-existierende Mitarbeiter mit gleichem ad_user (z.B. a.stockmann)
+        # wiederverwendet werden statt UniqueViolationError zu werfen.
         emp_by_pn: dict[str, Employee] = {}
         for personnel_number, ad_user, vorname, nachname, _rest in IT_TEAM:
             existing = await db.execute(
-                select(Employee).where(Employee.personnel_number == personnel_number)
+                select(Employee).where(
+                    (Employee.personnel_number == personnel_number)
+                    | (Employee.ad_username == ad_user)
+                )
             )
-            emp = existing.scalar_one_or_none()
+            emp = existing.scalars().first()
             if emp is None:
                 emp = Employee(
                     personnel_number=personnel_number,
