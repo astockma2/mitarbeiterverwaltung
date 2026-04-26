@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1] - 2026-04-26
+
+### Jahres-Dienstplan — IT-Team-Beispieldaten 2026
+- Neuer idempotenter Seed `seed_jahresplan_2026` legt 9 IT-Mitarbeiter (Stefan Raida, Holger Enig, Tom Scheike, Andre Stoecklein, Peter Czaikowski, Marc Nitsch, Ronny Weise, Andre Stockmann, Ben Nettkau) und ihre `DutyPlanEntry`-Eintraege fuer 2026 an.
+- Dienstplanung-Seite zeigt damit out-of-the-box die echten Tagescodes (U/Ug/A/S/B/I/H/Dr/K/su/T/TSC) wie auf dem Plan-Screenshot vom 26.04.2026.
+- Leere Felder = Normaldienst (Default).
+
 ## [0.2.0] - 2026-03-30
 
 ### Mitarbeiter-Seite (Frontend)

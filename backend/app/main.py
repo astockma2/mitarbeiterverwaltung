@@ -22,7 +22,9 @@ from app.api.tickets import router as tickets_router
 from app.config import get_settings
 from app.database import create_tables
 from app.services.seed import seed_demo_data
+from app.services.seed_jahresplan import seed_jahresplan_2026
 from app.services.seed_prod import seed_bot_user
+from app.services.license_service import LICENSE, start_license_tasks
 
 settings = get_settings()
 
@@ -38,18 +40,23 @@ async def lifespan(app: FastAPI):
     await create_tables()
     await seed_demo_data()
     await seed_bot_user()
+    await seed_jahresplan_2026()
     # Firebase fuer Push-Notifications initialisieren (optional)
     from app.services.push_notification import init_firebase
     init_firebase()
+    # License-Tasks (Lizenz-Check, Usage-Report)
+    license_tasks = await start_license_tasks()
     logging.getLogger(__name__).info("Anwendung gestartet")
     yield
+    for t in license_tasks:
+        t.cancel()
     logging.getLogger(__name__).info("Anwendung beendet")
 
 
 app = FastAPI(
     title=settings.app_name,
     description="Mitarbeiterverwaltung mit Zeiterfassung und Kommunikation",
-    version="1.5.0",
+    version="1.5.1",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     lifespan=lifespan,
@@ -64,6 +71,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Lizenz: Middleware + /lizenz + /api/license/install + /api/license/status
+app.middleware("http")(LICENSE.guard)
+LICENSE.register_routes(app)
 
 # API Router einbinden
 API_PREFIX = "/api/v1"
@@ -92,14 +103,14 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "ok", "version": "1.5.0"}
+    return {"status": "ok", "version": "1.5.1"}
 
 
 @app.get("/api/v1/app/version")
 async def app_version():
     """Aktuelle App-Version fuer Auto-Update-Check."""
     return {
-        "version": "1.5.0",
+        "version": "1.5.1",
         "download_url": "https://mva.c3po42.de/download/app-release.apk",
         "force_update": False,
     }
