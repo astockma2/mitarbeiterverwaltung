@@ -15,6 +15,7 @@ Die Mitarbeiterverwaltung ist eine On-Premise-Webanwendung fuer die IKK Kliniken
 - Mitarbeiterverwaltung mit Stammdaten, Abteilungen und Qualifikationen
 - Zeiterfassung mit Stempelfunktion, Zuschlagsberechnung und Pausenregelung
 - Abwesenheitsverwaltung (Urlaub, Krankheit, Fortbildung) mit Genehmigungsworkflow
+- Jahres-Dienstplanung mit farbigen Tagescodes, CSV-Export und serverseitiger Speicherung
 - Schichtplanung mit Regelwerk nach Arbeitszeitgesetz (ArbZG)
 - Interner Chat mit Echtzeit-Nachrichten (WebSocket)
 - Monatsabschluss und Loga-Export fuer die Lohnabrechnung
@@ -249,7 +250,8 @@ Das Frontend ist eine Single-Page-Application (SPA) mit React und TypeScript. Vi
 | Nachrichten | `/chat` | Alle | Echtzeit-Chat (WebSocket), Einzel- und Gruppengespraeche |
 | Mitarbeiter | `/employees` | HR/Admin | Suche, Filter, Paginierung, Detailansicht mit Bearbeitung |
 | Abteilungen | `/departments` | HR/Admin | Abteilungsliste mit Hierarchie und Kostenstellen |
-| Dienstplanung | `/shift-plans` | Leitung | Schichtvorlagen, Monatsplaene, Matrix-Ansicht |
+| Dienstplanung | `/shift-plans` | Leitung | Jahresmatrix fuer Urlaub, Bereitschaft, Hotline, Schulungen und Teamtermine |
+| Monatsplanung | `/shift-plans/monthly` | Leitung | Schichtvorlagen, Monatsplaene, Matrix-Ansicht |
 | Monatsabschluss | `/monthly-closing` | HR/Admin | Zeiten abschliessen und als CSV fuer Loga exportieren |
 | Auswertungen | `/reports` | HR/Admin | 4 Berichte: Jahres-, Abteilungs-, Zuschlags-, Abwesenheitsstatistik |
 
@@ -569,6 +571,8 @@ Vollstaendige interaktive Dokumentation unter `/api/docs` (Swagger UI).
 |---|---|---|
 | GET | `/shifts/templates` | Schichtvorlagen (Frueh, Spaet, Nacht etc.) |
 | POST | `/shifts/templates` | Schichtvorlage erstellen (Leitung) |
+| GET | `/shifts/duty-plan?year=YYYY` | Jahres-Dienstplanung laden |
+| PUT | `/shifts/duty-plan/cells` | Tagescodes fuer mehrere Mitarbeiter/Tage speichern oder leeren |
 | POST | `/shifts/plans` | Monatsplan erstellen (Leitung) |
 | GET | `/shifts/plans` | Monatsplaene auflisten |
 | POST | `/shifts/plans/{id}/publish` | Plan veroeffentlichen |

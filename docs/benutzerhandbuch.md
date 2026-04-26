@@ -299,14 +299,36 @@ Dieser Abschnitt richtet sich an Mitarbeiterinnen und Mitarbeiter mit der Rolle 
 
 Zeitkorrekturen werden von HR oder Admin direkt im System vorgenommen. Als Abteilungsleiter können Sie die Zeiteinträge Ihrer Mitarbeiter über die Auswertungen (HR-Zugang erforderlich) einsehen oder bei Fragen die Personalabteilung kontaktieren.
 
-### 6.4 Dienstplan erstellen und veröffentlichen
+### 6.4 Jahres-Dienstplanung pflegen
+
+Die Seite **Dienstplanung** startet mit der Jahresübersicht. Sie eignet sich für Urlaubsplanung, Bereitschaften, Hotline-Dienste, Schulungen, Teamtermine und weitere Tagescodes.
 
 1. Klicken Sie in der Seitenleiste auf **„Dienstplanung"**.
-2. Klicken Sie oben rechts auf **„Neuer Dienstplan"**.
-3. Im Dialog wählen Sie:
+2. Wählen Sie oben das Jahr aus.
+3. Wählen Sie in der Werkzeugleiste den gewünschten Code, zum Beispiel:
+   - **U** = Urlaub
+   - **Ug** = Urlaub geplant
+   - **B** = Bereitschaft
+   - **H** = Hotlinedienst
+   - **S** = Schulung
+   - **T** = Teammeeting
+4. Ziehen Sie mit gedrückter Maustaste über die Zellen, um den Code für mehrere Tage zu setzen.
+5. Nutzen Sie **Leeren** oder den Rechtsklick auf eine Zelle, um Einträge zu entfernen.
+6. Verwenden Sie die Suche, um einzelne Mitarbeiter oder Abteilungen schneller zu finden.
+
+Die Planung speichert jede Änderung serverseitig. Die Spalten **Rest 2025** und **Jahr** helfen bei der Urlaubsübersicht; der CSV-Export erstellt eine Excel-lesbare Jahresdatei.
+
+[Screenshot: Jahres-Dienstplanung mit farbigen Tagescodes]
+
+### 6.5 Monats-Dienstplan erstellen und veröffentlichen
+
+1. Klicken Sie in der Seitenleiste auf **„Dienstplanung"**.
+2. Klicken Sie oben rechts auf **„Monatsplanung"**.
+3. Klicken Sie in der Monatsplanung auf **„Neuer Dienstplan"**.
+4. Im Dialog wählen Sie:
    - **Abteilung** (Dropdown)
    - **Jahr** und **Monat**
-4. Klicken Sie auf **„Erstellen"**.
+5. Klicken Sie auf **„Erstellen"**.
 
 Der neue Plan erscheint mit dem Status **„Entwurf"** in der Liste.
 
@@ -327,7 +349,7 @@ Der neue Plan erscheint mit dem Status **„Entwurf"** in der Liste.
 
 > **Hinweis:** Veröffentlichte Pläne können nicht mehr direkt bearbeitet werden. Kontaktieren Sie bei Bedarf die IT.
 
-### 6.5 Besetzungsübersicht prüfen
+### 6.6 Besetzungsübersicht prüfen
 
 In der Kalenderansicht eines Dienstplans sehen Sie auf einen Blick, welche Mitarbeiter an welchem Tag welche Schicht haben. Tage ohne Eintrag (grauer Punkt) sind ungeplant.
 

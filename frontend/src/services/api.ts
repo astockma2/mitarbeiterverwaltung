@@ -80,6 +80,11 @@ export const viewShiftPlan = (planId: number) =>
   api.get(`/shifts/plans/${planId}/view`);
 export const getMySchedule = (startDate: string, endDate: string) =>
   api.get('/shifts/my-schedule', { params: { start_date: startDate, end_date: endDate } });
+export const getDutyPlan = (year: number) =>
+  api.get('/shifts/duty-plan', { params: { year } });
+export const saveDutyPlanCells = (
+  entries: Array<{ employee_id: number; date: string; code: string | null; note?: string | null }>
+) => api.put('/shifts/duty-plan/cells', { entries });
 
 // Admin
 export const getDashboard = () => api.get('/admin/dashboard');

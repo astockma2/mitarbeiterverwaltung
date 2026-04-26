@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+    body {
+        font-family: 'Segoe UI', Arial, sans-serif;
+        font-size: 11pt;
+        line-height: 1.6;
+        color: #222;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 40px;
+    }
+    h1 {
+        color: #1a365d;
+        font-size: 22pt;
+        border-bottom: 3px solid #2b6cb0;
+        padding-bottom: 8px;
+    }
+    h2 {
+        color: #2b6cb0;
+        font-size: 16pt;
+        border-bottom: 1px solid #bee3f8;
+        padding-bottom: 5px;
+        margin-top: 30px;
+    }
+    h3 {
+        color: #2c5282;
+        font-size: 13pt;
+        margin-top: 20px;
+    }
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 15px 0;
+        font-size: 10pt;
+    }
+    th {
+        background-color: #2b6cb0;
+        color: white;
+        padding: 8px 12px;
+        text-align: left;
+    }
+    td {
+        padding: 6px 12px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    tr:nth-child(even) {
+        background-color: #f7fafc;
+    }
+    blockquote {
+        border-left: 4px solid #2b6cb0;
+        margin: 15px 0;
+        padding: 10px 15px;
+        background-color: #ebf8ff;
+        color: #2c5282;
+    }
+    code {
+        background-color: #edf2f7;
+        padding: 2px 5px;
+        border-radius: 3px;
+    }
+    hr {
+        border: none;
+        border-top: 2px solid #e2e8f0;
+        margin: 25px 0;
+    }
+</style>
+</head>
+<body>
+<h1 id="benutzerhandbuch-mitarbeiterverwaltung-mva">Benutzerhandbuch — Mitarbeiterverwaltung (MVA)</h1>
+<h3 id="ilm-kreis-kliniken">Ilm-Kreis-Kliniken</h3>
+<p><strong>Version:</strong> 1.0 · <strong>Stand:</strong> April 2026<br />
+<strong>Zielgruppe:</strong> Alle Mitarbeiterinnen und Mitarbeiter der Ilm-Kreis-Kliniken</p>
+<hr />
+<h2 id="inhaltsverzeichnis">Inhaltsverzeichnis</h2>
+<ol>
+<li><a href="#1-erste-schritte">Erste Schritte</a></li>
+<li><a href="#2-zeiterfassung">Zeiterfassung</a></li>
+<li><a href="#3-abwesenheiten">Abwesenheiten</a></li>
+<li><a href="#4-dienstplan">Dienstplan</a></li>
+<li><a href="#5-nachrichten--chat">Nachrichten / Chat</a></li>
+<li><a href="#6-für-abteilungsleiter">Für Abteilungsleiter</a></li>
+<li><a href="#7-für-hr-und-administration">Für HR und Administration</a></li>
+</ol>
+<hr />
+<h2 id="1-erste-schritte">1. Erste Schritte</h2>
+<h3 id="11-anmelden-im-browser-web">1.1 Anmelden im Browser (Web)</h3>
+<ol>
+<li>Öffnen Sie Ihren Browser (z. B. Chrome, Firefox, Edge).</li>
+<li>Geben Sie die Adresse <strong>https://mva.c3po42.de</strong> ein und drücken Sie Enter.</li>
+<li>Die Anmeldeseite erscheint mit dem Logo der Ilm-Kreis-Kliniken.</li>
+<li>Geben Sie Ihren <strong>Benutzernamen</strong> ein (z. B. <code>m.mustermann</code>).</li>
+<li>Geben Sie Ihr <strong>Passwort</strong> ein.</li>
+<li>Klicken Sie auf den blauen Button <strong>„Anmelden"</strong>.</li>
+</ol>
+<p>[Screenshot: Anmeldeseite mit Benutzername- und Passwortfeld]</p>
+<blockquote>
+<p><strong>Hinweis:</strong> Ihr Benutzername entspricht Ihrem Windows-Anmeldekonto im Krankenhaus. Wenden Sie sich bei Fragen an die IT-Abteilung.</p>
+</blockquote>
+<h3 id="12-anmelden-in-der-android-app">1.2 Anmelden in der Android-App</h3>
+<ol>
+<li>Installieren Sie die App <strong>„MVA Ilm-Kreis-Kliniken"</strong> auf Ihrem Android-Gerät.</li>
+<li>Öffnen Sie die App.</li>
+<li>Geben Sie Ihren Benutzernamen und Ihr Passwort ein.</li>
+<li>Tippen Sie auf <strong>„Anmelden"</strong>.</li>
+</ol>
+<p>[Screenshot: App-Anmeldebildschirm]</p>
+<h3 id="13-passwort-zurucksetzen">1.3 Passwort zurücksetzen</h3>
+<p>Das Passwort wird über Ihr Windows-Konto im Krankenhaus verwaltet. Eine Selbstzurücksetzung ist in der Anwendung derzeit nicht möglich.</p>
+<p><strong>Bitte wenden Sie sich bei einem vergessenen Passwort direkt an:</strong>
+- Die IT-Abteilung Ihres Standorts, oder
+- Ihren Vorgesetzten, der die IT informieren kann.</p>
+<h3 id="14-abmelden">1.4 Abmelden</h3>
+<p>Um sich sicher abzumelden:</p>
+<ol>
+<li>Klicken Sie links unten in der dunklen Seitenleiste auf den roten Link <strong>„Abmelden"</strong> (mit dem Pfeil-Symbol).</li>
+<li>Sie werden automatisch zur Anmeldeseite weitergeleitet.</li>
+</ol>
+<blockquote>
+<p><strong>Tipp:</strong> Melden Sie sich immer ab, wenn Sie einen gemeinsam genutzten Computer verwenden.</p>
+</blockquote>
+<h3 id="15-die-benutzeroberflache-kennenlernen">1.5 Die Benutzeroberfläche kennenlernen</h3>
+<p>Nach der Anmeldung sehen Sie:</p>
+<ul>
+<li><strong>Linke Seitenleiste (dunkel):</strong> Hauptnavigation mit allen Bereichen wie Zeiterfassung, Dienstplan, Abwesenheiten usw.</li>
+<li><strong>Hauptbereich (hell):</strong> Der Inhalt des jeweils ausgewählten Bereichs.</li>
+<li><strong>Unten in der Seitenleiste:</strong> Ihr Name, Ihre Rolle und der Abmelden-Button.</li>
+</ul>
+<p>[Screenshot: Hauptansicht nach dem Login mit beschrifteter Seitenleiste]</p>
+<hr />
+<h2 id="2-zeiterfassung">2. Zeiterfassung</h2>
+<h3 id="21-einstempeln-kommen">2.1 Einstempeln (Kommen)</h3>
+<ol>
+<li>Klicken Sie in der linken Seitenleiste auf <strong>„Zeiterfassung"</strong>.</li>
+<li>Sie sehen den Bereich mit dem <strong>grünen Button „Einstempeln"</strong>.</li>
+<li>Klicken Sie auf diesen Button.</li>
+<li>Die Ansicht wechselt: Sie sehen nun in grün <strong>„Eingestempelt seit HH:MM"</strong> und die bisherige Arbeitszeit.</li>
+</ol>
+<p>[Screenshot: Zeiterfassung — grüner „Einstempeln"-Button]</p>
+<blockquote>
+<p><strong>Hinweis:</strong> Das Einstempeln ist nur möglich, wenn Sie sich noch nicht eingestempelt haben. Sollte der Button fehlen, sind Sie bereits eingestempelt.</p>
+</blockquote>
+<h3 id="22-ausstempeln-gehen">2.2 Ausstempeln (Gehen)</h3>
+<ol>
+<li>Gehen Sie zu <strong>„Zeiterfassung"</strong>.</li>
+<li>Neben Ihrer Arbeitszeit sehen Sie ein Feld <strong>„Pause (Min)"</strong>.</li>
+<li>Tragen Sie die Anzahl Ihrer Pausenminuten ein (Standard: 30 Minuten).</li>
+<li>Klicken Sie auf den roten Button <strong>„Ausstempeln"</strong>.</li>
+</ol>
+<p>[Screenshot: Zeiterfassung — rotes „Ausstempeln"-Button mit Pausen-Feld]</p>
+<blockquote>
+<p><strong>Wichtig:</strong> Geben Sie die Pause korrekt ein. Die Pausenzeiten werden automatisch nach dem Arbeitszeitgesetz (ArbZG) geprüft.</p>
+</blockquote>
+<h3 id="23-pausenregelung-nach-arbzg">2.3 Pausenregelung nach ArbZG</h3>
+<p>Die Anwendung berechnet Pausen automatisch nach gesetzlichen Vorgaben:</p>
+<table>
+<thead>
+<tr>
+<th>Arbeitszeit</th>
+<th>Mindestpause</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mehr als 6 Stunden</td>
+<td>30 Minuten</td>
+</tr>
+<tr>
+<td>Mehr als 9 Stunden</td>
+<td>45 Minuten</td>
+</tr>
+</tbody>
+</table>
+<p>Sie müssen die tatsächliche Pausenzeit beim Ausstempeln eintragen. Die Nettostunden (abzüglich Pausen) werden automatisch berechnet und in der Übersicht angezeigt.</p>
+<h3 id="24-tagesubersicht-einsehen">2.4 Tagesübersicht einsehen</h3>
+<p>Auf der Seite „Zeiterfassung" sehen Sie direkt unterhalb des Stempel-Bereichs:</p>
+<ul>
+<li><strong>Heute — X.Xh (Pause: XX Min):</strong> Ihre heutige Gesamtarbeitszeit mit blauem Fortschrittsbalken (8-Stunden-Ziel).</li>
+<li><strong>Heutige Einträge:</strong> Eine Tabelle mit allen Ein- und Ausstempelungen des Tages, inkl. Pausen, Nettozeit, Schichttyp und Zuschlägen (z. B. Nachtzuschlag).</li>
+</ul>
+<p>[Screenshot: Tagesübersicht mit Tabelle der heutigen Einträge]</p>
+<h3 id="25-zeitkorrektur-beantragen">2.5 Zeitkorrektur beantragen</h3>
+<p>Haben Sie vergessen einzustempeln oder ist ein Fehler aufgetreten? Wenden Sie sich an Ihren <strong>Abteilungsleiter</strong> oder die <strong>Personalabteilung (HR)</strong>.</p>
+<p>Diese können im System eine Zeitkorrektur vornehmen. Halten Sie folgende Informationen bereit:
+- Datum
+- Uhrzeitkorrektur (Kommen / Gehen)
+- Grund der Korrektur</p>
+<blockquote>
+<p><strong>Tipp:</strong> Melden Sie Korrekturen möglichst zeitnah — spätestens bis zum Ende des laufenden Monats.</p>
+</blockquote>
+<hr />
+<h2 id="3-abwesenheiten">3. Abwesenheiten</h2>
+<h3 id="31-urlaubsantrag-stellen">3.1 Urlaubsantrag stellen</h3>
+<ol>
+<li>Klicken Sie in der Seitenleiste auf <strong>„Abwesenheiten"</strong>.</li>
+<li>Oben sehen Sie Ihr <strong>Urlaubskonto</strong> (Anspruch, genommen, beantragt, verbleibend).</li>
+<li>Klicken Sie rechts auf den blauen Button <strong>„Neuer Antrag"</strong>.</li>
+<li>Es erscheint ein Formular. Füllen Sie es aus:</li>
+<li><strong>Typ:</strong> Wählen Sie „Urlaub" aus dem Dropdown-Menü.</li>
+<li><strong>Von:</strong> Geben Sie das Startdatum ein.</li>
+<li><strong>Bis:</strong> Geben Sie das Enddatum ein.</li>
+<li><strong>Anmerkung:</strong> Optional — z. B. „Familienurlaub".</li>
+<li>Klicken Sie auf den grünen Button <strong>„Absenden"</strong>.</li>
+</ol>
+<p>[Screenshot: Abwesenheits-Formular mit ausgefüllten Feldern]</p>
+<blockquote>
+<p>Ihr Antrag erhält den Status <strong>„Beantragt"</strong> (gelb). Sobald der Abteilungsleiter ihn genehmigt, wechselt er zu <strong>„Genehmigt"</strong> (grün).</p>
+</blockquote>
+<h3 id="32-urlaubskonto-einsehen-resturlaub">3.2 Urlaubskonto einsehen (Resturlaub)</h3>
+<p>Ihr Urlaubskonto wird oben auf der Seite „Abwesenheiten" immer aktuell angezeigt:</p>
+<ul>
+<li><strong>Anspruch [Jahr]:</strong> Ihr gesamter Jahresurlaub</li>
+<li><strong>Genommen:</strong> Bereits genutzter Urlaub</li>
+<li><strong>Beantragt:</strong> Urlaubstage in Bearbeitung</li>
+<li><strong>Verbleibend:</strong> Ihr Resturlaub (grün)</li>
+</ul>
+<p>[Screenshot: Urlaubskonto-Übersicht]</p>
+<h3 id="33-krankmeldung-einreichen">3.3 Krankmeldung einreichen</h3>
+<ol>
+<li>Gehen Sie zu <strong>„Abwesenheiten"</strong> → <strong>„Neuer Antrag"</strong>.</li>
+<li>Wählen Sie als Typ <strong>„Krankheit"</strong>.</li>
+<li>Tragen Sie das erste und das voraussichtlich letzte Krankheitsdatum ein.</li>
+<li>Klicken Sie auf <strong>„Absenden"</strong>.</li>
+</ol>
+<blockquote>
+<p><strong>Hinweis:</strong> Die Krankmeldung dient der Dokumentation im System. Die ärztliche Bescheinigung geben Sie bitte weiterhin wie gewohnt in der Personalabteilung ab.</p>
+</blockquote>
+<h3 id="34-fortbildung-oder-sonderurlaub-beantragen">3.4 Fortbildung oder Sonderurlaub beantragen</h3>
+<p>Das Verfahren ist dasselbe wie beim Urlaubsantrag:</p>
+<ol>
+<li><strong>„Neuer Antrag"</strong> klicken.</li>
+<li>Als Typ <strong>„Fortbildung"</strong> oder <strong>„Sonderurlaub"</strong> wählen.</li>
+<li>Datum eingeben und ggf. eine Anmerkung hinzufügen (z. B. Name der Fortbildung).</li>
+<li><strong>„Absenden"</strong> klicken.</li>
+</ol>
+<h3 id="35-status-eines-antrags-prufen">3.5 Status eines Antrags prüfen</h3>
+<p>In der Tabelle unter „Abwesenheiten" sehen Sie alle Ihre Anträge mit ihrem aktuellen Status:</p>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Farbe</th>
+<th>Bedeutung</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Beantragt</td>
+<td>Gelb</td>
+<td>Wartet auf Genehmigung</td>
+</tr>
+<tr>
+<td>Genehmigt</td>
+<td>Grün</td>
+<td>Vom Vorgesetzten genehmigt</td>
+</tr>
+<tr>
+<td>Abgelehnt</td>
+<td>Rot</td>
+<td>Vom Vorgesetzten abgelehnt</td>
+</tr>
+<tr>
+<td>Storniert</td>
+<td>Grau</td>
+<td>Von Ihnen zurückgezogen</td>
+</tr>
+</tbody>
+</table>
+<p>[Screenshot: Abwesenheitsliste mit farbigen Status-Badges]</p>
+<hr />
+<h2 id="4-dienstplan">4. Dienstplan</h2>
+<h3 id="41-eigenen-dienstplan-einsehen">4.1 Eigenen Dienstplan einsehen</h3>
+<ol>
+<li>Klicken Sie in der Seitenleiste auf <strong>„Mein Dienstplan"</strong>.</li>
+<li>Oben sehen Sie eine Monatsauswahl (Standard: aktueller Monat).</li>
+<li>Wählen Sie bei Bedarf einen anderen Monat aus.</li>
+<li>Der Kalender zeigt alle Ihre geplanten Schichten für den gewählten Monat.</li>
+</ol>
+<p>[Screenshot: Dienstplan-Kalender mit eingetragenen Schichten]</p>
+<ul>
+<li><strong>Heute</strong> ist mit einem blauen Rahmen hervorgehoben.</li>
+<li><strong>Wochenendtage</strong> (Samstag/Sonntag) haben einen hellgrauen Hintergrund.</li>
+</ul>
+<h3 id="42-schichten-verstehen">4.2 Schichten verstehen</h3>
+<p>Jede Schicht wird mit einem farbigen Kürzel angezeigt:</p>
+<table>
+<thead>
+<tr>
+<th>Farbe</th>
+<th>Kürzel</th>
+<th>Bedeutung</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Grün</td>
+<td>F</td>
+<td>Frühschicht</td>
+</tr>
+<tr>
+<td>Gelb</td>
+<td>S</td>
+<td>Spätschicht</td>
+</tr>
+<tr>
+<td>Blau/Lila</td>
+<td>N</td>
+<td>Nachtschicht</td>
+</tr>
+<tr>
+<td>Grau</td>
+<td>—</td>
+<td>Sonstige Schicht</td>
+</tr>
+</tbody>
+</table>
+<p>Unterhalb des Kalenders finden Sie die <strong>Schichtliste</strong> mit genauen Uhrzeiten (z. B. „06:00 – 14:00") und dem Status (Bestätigt / offen).</p>
+<blockquote>
+<p><strong>Hinweis:</strong> Der Dienstplan wird von Ihrer Abteilungsleitung erstellt und veröffentlicht. Erst nach der Veröffentlichung ist er für Sie sichtbar.</p>
+</blockquote>
+<h3 id="43-schichttausch-beantragen">4.3 Schichttausch beantragen</h3>
+<p>Ein direkter Schichttausch ist über das System noch nicht möglich. Sprechen Sie Ihren Wunsch für einen Tausch direkt mit Ihrer Abteilungsleitung ab oder schreiben Sie ihr eine Nachricht im <strong>Chat</strong> (siehe Kapitel 5).</p>
+<h3 id="44-vertretung-anbieten-einspringen">4.4 Vertretung anbieten / Einspringen</h3>
+<p>Wenn Sie bei einer freien Schicht einspringen können, wenden Sie sich direkt an Ihre Abteilungsleitung — persönlich oder über den <strong>Chat</strong> in der Anwendung. Teilen Sie mit:
+- Das Datum der Schicht
+- Die Schicht (z. B. Frühschicht)
+- Ihre Verfügbarkeit</p>
+<hr />
+<h2 id="5-nachrichten-chat">5. Nachrichten / Chat</h2>
+<h3 id="51-einzelnachricht-senden">5.1 Einzelnachricht senden</h3>
+<ol>
+<li>Klicken Sie in der Seitenleiste auf <strong>„Nachrichten"</strong>.</li>
+<li>Links sehen Sie die Liste Ihrer vorhandenen Gespräche.</li>
+<li>Um ein neues Gespräch zu starten, klicken Sie auf den blauen <strong>„+"-Button</strong> oben rechts in der Nachrichtenliste.</li>
+<li>Eine Mitarbeiterliste erscheint. Suchen Sie nach dem Namen (Suchfeld oben).</li>
+<li>Klicken Sie auf den gewünschten Mitarbeiter.</li>
+<li>Das Chatfenster öffnet sich rechts.</li>
+<li>Schreiben Sie Ihre Nachricht in das Textfeld unten und drücken Sie <strong>Enter</strong> oder klicken Sie auf den blauen <strong>Senden-Button</strong> (Pfeil).</li>
+</ol>
+<p>[Screenshot: Chat-Ansicht mit geöffnetem Gespräch und Texteingabe]</p>
+<h3 id="52-bestehende-gesprache-offnen">5.2 Bestehende Gespräche öffnen</h3>
+<p>In der linken Spalte sehen Sie alle Ihre Gespräche. Gespräche mit ungelesenen Nachrichten werden <strong>fett</strong> angezeigt und zeigen eine blaue Zahl (Anzahl ungelesener Nachrichten).</p>
+<p>Klicken Sie auf ein Gespräch, um es zu öffnen.</p>
+<h3 id="53-mitarbeiter-nach-abteilung-suchen">5.3 Mitarbeiter nach Abteilung suchen</h3>
+<p>Beim Starten eines neuen Chats (Schritt 3–4 oben) sind die Mitarbeiter nach <strong>Abteilungen</strong> gruppiert. Klicken Sie auf den Abteilungsnamen, um die Liste auf- oder zuzuklappen.</p>
+<p>Ein grüner Punkt neben dem Namen bedeutet: Der Mitarbeiter ist gerade online.</p>
+<p>[Screenshot: Mitarbeiterliste nach Abteilungen gruppiert]</p>
+<h3 id="54-gruppenchat-abteilungs-chat">5.4 Gruppenchat / Abteilungs-Chat</h3>
+<p>Bestehende Gruppengespräche (z. B. der Abteilungs-Chat) erscheinen ebenfalls in Ihrer Gesprächsliste. Klicken Sie darauf, um am Gespräch teilzunehmen.</p>
+<blockquote>
+<p><strong>Hinweis:</strong> Neue Gruppenkonversationen werden derzeit von der Abteilungsleitung oder der IT eingerichtet.</p>
+</blockquote>
+<hr />
+<h2 id="6-fur-abteilungsleiter">6. Für Abteilungsleiter</h2>
+<p>Dieser Abschnitt richtet sich an Mitarbeiterinnen und Mitarbeiter mit der Rolle <strong>Abteilungsleitung</strong> oder <strong>Teamleitung</strong>.</p>
+<h3 id="61-mitarbeiter-der-abteilung-einsehen">6.1 Mitarbeiter der Abteilung einsehen</h3>
+<ol>
+<li>Klicken Sie in der Seitenleiste auf <strong>„Mitarbeiter"</strong>.</li>
+<li>Die Liste zeigt alle Mitarbeiter, nach Abteilung gruppiert.</li>
+<li>Nutzen Sie das Suchfeld oben (nach Name, Personalnummer oder E-Mail).</li>
+<li>Mit dem Abteilungs-Dropdown können Sie die Ansicht auf eine bestimmte Abteilung einschränken.</li>
+<li>Klicken Sie auf eine Zeile, um das Profil eines Mitarbeiters zu öffnen.</li>
+</ol>
+<p>[Screenshot: Mitarbeiterliste mit Suchfeld und Abteilungsfilter]</p>
+<h3 id="62-urlaubsantrage-genehmigen-oder-ablehnen">6.2 Urlaubsanträge genehmigen oder ablehnen</h3>
+<ol>
+<li>Klicken Sie auf <strong>„Abwesenheiten"</strong>.</li>
+<li>Als Abteilungsleiter sehen Sie oben zwei Reiter: <strong>„Meine Abwesenheiten"</strong> und <strong>„Offene Anträge (X)"</strong>.</li>
+<li>Klicken Sie auf <strong>„Offene Anträge"</strong>.</li>
+<li>Die Tabelle zeigt alle noch nicht bearbeiteten Anträge Ihrer Mitarbeiter.</li>
+<li>Pro Antrag sehen Sie zwei Buttons:</li>
+<li>Grüner <strong>Haken-Button</strong>: Antrag genehmigen</li>
+<li>Roter <strong>X-Button</strong>: Antrag ablehnen</li>
+<li>Klicken Sie den entsprechenden Button.</li>
+</ol>
+<p>[Screenshot: Offene Anträge mit grünem Haken und rotem X-Button]</p>
+<h3 id="63-zeitkorrekturen-prufen">6.3 Zeitkorrekturen prüfen</h3>
+<p>Zeitkorrekturen werden von HR oder Admin direkt im System vorgenommen. Als Abteilungsleiter können Sie die Zeiteinträge Ihrer Mitarbeiter über die Auswertungen (HR-Zugang erforderlich) einsehen oder bei Fragen die Personalabteilung kontaktieren.</p>
+<h3 id="64-jahres-dienstplanung-pflegen">6.4 Jahres-Dienstplanung pflegen</h3>
+<p>Die Seite <strong>Dienstplanung</strong> startet mit der Jahresübersicht. Sie eignet sich für Urlaubsplanung, Bereitschaften, Hotline-Dienste, Schulungen, Teamtermine und weitere Tagescodes.</p>
+<ol>
+<li>Klicken Sie in der Seitenleiste auf <strong>„Dienstplanung"</strong>.</li>
+<li>Wählen Sie oben das Jahr aus.</li>
+<li>Wählen Sie in der Werkzeugleiste den gewünschten Code, zum Beispiel:</li>
+<li><strong>U</strong> = Urlaub</li>
+<li><strong>Ug</strong> = Urlaub geplant</li>
+<li><strong>B</strong> = Bereitschaft</li>
+<li><strong>H</strong> = Hotlinedienst</li>
+<li><strong>S</strong> = Schulung</li>
+<li><strong>T</strong> = Teammeeting</li>
+<li>Ziehen Sie mit gedrückter Maustaste über die Zellen, um den Code für mehrere Tage zu setzen.</li>
+<li>Nutzen Sie <strong>Leeren</strong> oder den Rechtsklick auf eine Zelle, um Einträge zu entfernen.</li>
+<li>Verwenden Sie die Suche, um einzelne Mitarbeiter oder Abteilungen schneller zu finden.</li>
+</ol>
+<p>Die Planung speichert jede Änderung serverseitig. Die Spalten <strong>Rest 2025</strong> und <strong>Jahr</strong> helfen bei der Urlaubsübersicht; der CSV-Export erstellt eine Excel-lesbare Jahresdatei.</p>
+<p>[Screenshot: Jahres-Dienstplanung mit farbigen Tagescodes]</p>
+<h3 id="65-monats-dienstplan-erstellen-und-veroffentlichen">6.5 Monats-Dienstplan erstellen und veröffentlichen</h3>
+<ol>
+<li>Klicken Sie in der Seitenleiste auf <strong>„Dienstplanung"</strong>.</li>
+<li>Klicken Sie oben rechts auf <strong>„Monatsplanung"</strong>.</li>
+<li>Klicken Sie in der Monatsplanung auf <strong>„Neuer Dienstplan"</strong>.</li>
+<li>Im Dialog wählen Sie:</li>
+<li><strong>Abteilung</strong> (Dropdown)</li>
+<li><strong>Jahr</strong> und <strong>Monat</strong></li>
+<li>Klicken Sie auf <strong>„Erstellen"</strong>.</li>
+</ol>
+<p>Der neue Plan erscheint mit dem Status <strong>„Entwurf"</strong> in der Liste.</p>
+<p><strong>Schichten einplanen:</strong></p>
+<ol>
+<li>Wählen Sie in der Werkzeugleiste ein Schicht-Kürzel (z. B. „F" für Frühschicht).</li>
+<li>Klicken Sie in der Tabelle auf <strong>„Anzeigen"</strong> beim gewünschten Plan.</li>
+<li>Der Kalender zeigt alle Mitarbeiter und alle Tage des Monats.</li>
+<li><strong>Ziehen</strong> Sie mit der Maus über die gewünschten Zellen (Mitarbeiter × Tag), um Schichten zuzuweisen.</li>
+<li>Zum Löschen einer Schicht wählen Sie den <strong>„Radierer"</strong> in der Werkzeugleiste und ziehen über die betreffenden Zellen.</li>
+</ol>
+<p><strong>Dienstplan veröffentlichen:</strong></p>
+<ol>
+<li>Klicken Sie in der Planliste auf den grünen Button <strong>„Veröffentlichen"</strong>.</li>
+<li>Der Status wechselt auf <strong>„Veröffentlicht"</strong> — ab sofort sehen alle Mitarbeiter der Abteilung ihren Dienstplan.</li>
+</ol>
+<p>[Screenshot: Dienstplanung mit Werkzeugleiste und Kalender-Raster]</p>
+<blockquote>
+<p><strong>Hinweis:</strong> Veröffentlichte Pläne können nicht mehr direkt bearbeitet werden. Kontaktieren Sie bei Bedarf die IT.</p>
+</blockquote>
+<h3 id="66-besetzungsubersicht-prufen">6.6 Besetzungsübersicht prüfen</h3>
+<p>In der Kalenderansicht eines Dienstplans sehen Sie auf einen Blick, welche Mitarbeiter an welchem Tag welche Schicht haben. Tage ohne Eintrag (grauer Punkt) sind ungeplant.</p>
+<hr />
+<h2 id="7-fur-hr-und-administration">7. Für HR und Administration</h2>
+<p>Dieser Abschnitt richtet sich an Mitarbeiterinnen und Mitarbeiter mit der Rolle <strong>HR</strong> oder <strong>Administrator</strong>.</p>
+<h3 id="71-neuen-mitarbeiter-anlegen">7.1 Neuen Mitarbeiter anlegen</h3>
+<ol>
+<li>Klicken Sie auf <strong>„Mitarbeiter"</strong> in der Seitenleiste.</li>
+<li>Klicken Sie oben rechts auf den Button <strong>„Neuer Mitarbeiter"</strong> (falls sichtbar, je nach Berechtigung).</li>
+<li>Füllen Sie das Formular mit den Stammdaten aus:</li>
+<li>Vorname, Nachname</li>
+<li>Personalnummer</li>
+<li>E-Mail-Adresse</li>
+<li>Abteilung, Rolle, Beschäftigungsart</li>
+<li>Eintrittsdatum, Wochenstunden, Urlaubsanspruch</li>
+<li>Klicken Sie auf <strong>„Speichern"</strong>.</li>
+</ol>
+<blockquote>
+<p>Der neue Mitarbeiter kann sich mit seinem Windows-Benutzernamen anmelden, sobald das Konto im Active Directory angelegt ist.</p>
+</blockquote>
+<h3 id="72-mitarbeiter-deaktivieren">7.2 Mitarbeiter deaktivieren</h3>
+<ol>
+<li>Klicken Sie auf <strong>„Mitarbeiter"</strong> und öffnen Sie das Profil des betreffenden Mitarbeiters (Klick auf die Zeile).</li>
+<li>Klicken Sie auf den Button <strong>„Bearbeiten"</strong> (Stift-Symbol).</li>
+<li>Setzen Sie den Schalter <strong>„Aktiv"</strong> auf inaktiv.</li>
+<li>Klicken Sie auf <strong>„Speichern"</strong>.</li>
+</ol>
+<p>Der Mitarbeiter erscheint danach mit einem roten <strong>„Inaktiv"</strong>-Badge und kann sich nicht mehr anmelden.</p>
+<p>[Screenshot: Mitarbeiterprofil mit Bearbeiten-Button]</p>
+<h3 id="73-monatsabschluss-durchfuhren">7.3 Monatsabschluss durchführen</h3>
+<ol>
+<li>Klicken Sie in der Seitenleiste auf <strong>„Monatsabschluss"</strong>.</li>
+<li>Wählen Sie das gewünschte <strong>Jahr</strong> und den <strong>Monat</strong> aus.</li>
+<li>Prüfen Sie die angezeigten Zeiteinträge auf Vollständigkeit.</li>
+<li>Klicken Sie auf <strong>„Abschluss durchführen"</strong>, um den Monat zu sperren.</li>
+</ol>
+<blockquote>
+<p>Nach dem Abschluss können Zeiteinträge des betreffenden Monats nicht mehr verändert werden. Stellen Sie sicher, dass alle Korrekturen vorher eingetragen wurden.</p>
+</blockquote>
+<p>[Screenshot: Monatsabschluss-Seite mit Monatsauswahl und Abschluss-Button]</p>
+<h3 id="74-csv-export-fur-die-lohnabrechnung-loga">7.4 CSV-Export für die Lohnabrechnung (LOGA)</h3>
+<ol>
+<li>Klicken Sie auf <strong>„Auswertungen"</strong> in der Seitenleiste.</li>
+<li>Wählen Sie das gewünschte <strong>Jahr</strong> und den <strong>Monat</strong> aus.</li>
+<li>Klicken Sie auf den lila Button <strong>„CSV-Export"</strong>.</li>
+<li>Die Datei wird automatisch heruntergeladen (Name: <code>report_JJJJ_MM.csv</code>).</li>
+<li>Importieren Sie diese Datei in Ihr Lohnabrechnungssystem (LOGA).</li>
+</ol>
+<p>[Screenshot: Auswertungen-Seite mit CSV-Export-Button]</p>
+<h3 id="75-berichte-und-auswertungen">7.5 Berichte und Auswertungen</h3>
+<p>Unter <strong>„Auswertungen"</strong> stehen vier Auswertungstypen zur Verfügung:</p>
+<table>
+<thead>
+<tr>
+<th>Reiter</th>
+<th>Inhalt</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Jahresübersicht</td>
+<td>Soll/Ist-Stunden, Überstunden, Krank- und Urlaubstage je Mitarbeiter</td>
+</tr>
+<tr>
+<td>Abteilungen</td>
+<td>Arbeitsstunden und Kranktage je Abteilung (pro Monat)</td>
+</tr>
+<tr>
+<td>Zuschläge</td>
+<td>Nacht-, Sonntags-, Feiertags- und Samstagszuschläge</td>
+</tr>
+<tr>
+<td>Abwesenheiten</td>
+<td>Abwesenheitstage nach Typ und Monat, Top-Kranktage</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Auswertung laden:</strong></p>
+<ol>
+<li>Wählen Sie den gewünschten Reiter.</li>
+<li>Stellen Sie Jahr (und ggf. Monat) ein.</li>
+<li>Klicken Sie auf <strong>„Laden"</strong>.</li>
+</ol>
+<p>[Screenshot: Auswertungen — Jahresübersicht mit Tabelle und Kennzahlen]</p>
+<hr />
+<h2 id="haufige-fragen">Häufige Fragen</h2>
+<p><strong>Ich kann mich nicht anmelden — was tun?</strong><br />
+Prüfen Sie, ob Ihr Benutzername korrekt eingetragen ist (kein „@" oder Domain-Anteil). Wenden Sie sich bei anhaltenden Problemen an die IT-Abteilung.</p>
+<p><strong>Ich habe vergessen einzustempeln — was jetzt?</strong><br />
+Wenden Sie sich an Ihre Abteilungsleitung oder die Personalabteilung. Diese können eine Zeitkorrektur eintragen.</p>
+<p><strong>Mein Antrag hat den Status „Abgelehnt" — warum?</strong><br />
+Sprechen Sie direkt mit Ihrer Abteilungsleitung. Im System gibt es derzeit kein separates Kommentarfeld für Ablehnungsgründe.</p>
+<p><strong>Ich sehe keinen Dienstplan für den aktuellen Monat.</strong><br />
+Der Dienstplan wurde möglicherweise noch nicht veröffentlicht. Sprechen Sie Ihre Abteilungsleitung an.</p>
+<p><strong>Wie erkenne ich, ob meine Nachricht angekommen ist?</strong><br />
+Nachrichten, die Sie senden, erscheinen sofort in Ihrer Ansicht auf der rechten Seite (blauer Hintergrund). Eine separate Lesebestätigung ist derzeit nicht verfügbar.</p>
+<hr />
+<p><em>Bei weiteren Fragen wenden Sie sich an die IT-Abteilung der Ilm-Kreis-Kliniken.</em><br />
+<em>Dieses Handbuch wird regelmäßig aktualisiert.</em></p>
+</body>
+</html>

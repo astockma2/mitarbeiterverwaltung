@@ -17,6 +17,7 @@ from app.models.employee import Employee
 from app.models.shift import (
     CoverageRequest,
     CoverageStatus,
+    DutyPlanEntry,
     PlanStatus,
     ShiftAssignment,
     ShiftPlan,
@@ -110,6 +111,177 @@ class SwapRequestCreate(BaseModel):
     my_assignment_id: int
     target_assignment_id: int
     reason: Optional[str] = None
+
+
+DUTY_PLAN_CODES = {
+    "U",
+    "Ug",
+    "A",
+    "S",
+    "B",
+    "I",
+    "H",
+    "M",
+    "Dr",
+    "K",
+    "su",
+    "T",
+    "Ez",
+    "TSC",
+}
+
+
+class DutyPlanCellUpsert(BaseModel):
+    employee_id: int
+    date: date
+    code: Optional[str] = None
+    note: Optional[str] = None
+
+
+class DutyPlanBulkUpsert(BaseModel):
+    entries: list[DutyPlanCellUpsert]
+
+
+class DutyPlanEntryResponse(BaseModel):
+    id: int
+    employee_id: int
+    date: date
+    code: str
+    note: Optional[str] = None
+
+
+class DutyPlanResponse(BaseModel):
+    year: int
+    entries: list[DutyPlanEntryResponse]
+
+
+# === Jahres-Dienstplanung ===
+
+
+@router.get("/duty-plan", response_model=DutyPlanResponse)
+async def get_duty_plan(
+    year: int = Query(..., ge=2000, le=2100),
+    db: AsyncSession = Depends(get_db),
+    current_user: Employee = Depends(get_current_user),
+):
+    """Jahres-Dienstplanungscodes fuer sichtbare Mitarbeiter laden."""
+    if not is_manager(current_user):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+
+    query = (
+        select(DutyPlanEntry)
+        .join(Employee, DutyPlanEntry.employee_id == Employee.id)
+        .where(DutyPlanEntry.date.between(date(year, 1, 1), date(year, 12, 31)))
+        .order_by(DutyPlanEntry.date, Employee.last_name, Employee.first_name)
+    )
+    if not is_hr(current_user):
+        query = query.where(Employee.department_id == current_user.department_id)
+
+    result = await db.execute(query)
+    return DutyPlanResponse(
+        year=year,
+        entries=[_duty_plan_entry_to_response(e) for e in result.scalars().all()],
+    )
+
+
+@router.put("/duty-plan/cells", response_model=list[DutyPlanEntryResponse])
+async def upsert_duty_plan_cells(
+    request: DutyPlanBulkUpsert,
+    db: AsyncSession = Depends(get_db),
+    current_user: Employee = Depends(get_current_user),
+):
+    """Mehrere Jahres-Dienstplan-Zellen setzen oder leeren."""
+    if not is_manager(current_user):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+
+    if not request.entries:
+        return []
+
+    employee_ids = {entry.employee_id for entry in request.entries}
+    employee_result = await db.execute(
+        select(Employee).where(Employee.id.in_(employee_ids))
+    )
+    employees_by_id = {employee.id: employee for employee in employee_result.scalars().all()}
+
+    missing_ids = employee_ids - set(employees_by_id)
+    if missing_ids:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Mitarbeiter nicht gefunden: {', '.join(map(str, sorted(missing_ids)))}",
+        )
+
+    if not is_hr(current_user):
+        forbidden = [
+            employee.full_name
+            for employee in employees_by_id.values()
+            if employee.department_id != current_user.department_id
+        ]
+        if forbidden:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Keine Berechtigung fuer: {', '.join(forbidden)}",
+            )
+
+    saved_entries: list[DutyPlanEntry] = []
+
+    for cell in request.entries:
+        code = cell.code.strip() if cell.code else None
+        if code and code not in DUTY_PLAN_CODES:
+            raise HTTPException(status_code=400, detail=f"Ungueltiger Dienstplan-Code: {code}")
+
+        existing_result = await db.execute(
+            select(DutyPlanEntry).where(
+                DutyPlanEntry.employee_id == cell.employee_id,
+                DutyPlanEntry.date == cell.date,
+            )
+        )
+        existing = existing_result.scalar_one_or_none()
+
+        if not code:
+            if existing:
+                await log_action(
+                    db,
+                    current_user.id,
+                    "DELETE",
+                    "duty_plan_entries",
+                    existing.id,
+                    {"employee_id": cell.employee_id, "date": cell.date.isoformat()},
+                )
+                await db.delete(existing)
+            continue
+
+        if existing:
+            existing.code = code
+            existing.note = cell.note
+            existing.updated_by = current_user.id
+            entry = existing
+        else:
+            entry = DutyPlanEntry(
+                employee_id=cell.employee_id,
+                date=cell.date,
+                code=code,
+                note=cell.note,
+                created_by=current_user.id,
+                updated_by=current_user.id,
+            )
+            db.add(entry)
+
+        await db.flush()
+        await log_action(
+            db,
+            current_user.id,
+            "UPSERT",
+            "duty_plan_entries",
+            entry.id,
+            {
+                "employee_id": cell.employee_id,
+                "date": cell.date.isoformat(),
+                "code": code,
+            },
+        )
+        saved_entries.append(entry)
+
+    return [_duty_plan_entry_to_response(entry) for entry in saved_entries]
 
 
 # === Schichtvorlagen ===
@@ -844,6 +1016,16 @@ def _template_to_response(t: ShiftTemplate) -> ShiftTemplateResponse:
         duration_hours=t.duration_hours,
         net_hours=t.net_hours,
         is_active=t.is_active,
+    )
+
+
+def _duty_plan_entry_to_response(e: DutyPlanEntry) -> DutyPlanEntryResponse:
+    return DutyPlanEntryResponse(
+        id=e.id,
+        employee_id=e.employee_id,
+        date=e.date,
+        code=e.code,
+        note=e.note,
     )
 
 

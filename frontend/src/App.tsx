@@ -8,6 +8,7 @@ import MySchedule from './pages/MySchedule';
 import Absences from './pages/Absences';
 import Employees from './pages/Employees';
 import Departments from './pages/Departments';
+import DutyPlanning from './pages/DutyPlanning';
 import ShiftPlans from './pages/ShiftPlans';
 import Reports from './pages/Reports';
 import EmployeeDetail from './pages/EmployeeDetail';
@@ -47,7 +48,8 @@ export default function App() {
             {isHR && <Route path="/employees" element={<Employees />} />}
             <Route path="/employees/:id" element={<EmployeeDetail isHR={isHR} />} />
             {isHR && <Route path="/departments" element={<Departments />} />}
-            {isManager && <Route path="/shift-plans" element={<ShiftPlans />} />}
+            {isManager && <Route path="/shift-plans" element={<DutyPlanning />} />}
+            {isManager && <Route path="/shift-plans/monthly" element={<ShiftPlans />} />}
             {isHR && <Route path="/monthly-closing" element={<MonthlyClosingPage />} />}
             {isHR && <Route path="/reports" element={<Reports />} />}
             <Route path="*" element={<Navigate to="/" />} />

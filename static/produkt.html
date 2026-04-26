@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MVA — Mitarbeiterverwaltung für Kliniken</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🏥</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #0f172a; --bg-deep: #020617; --card: #1e293b;
+            --card-hover: #273548; --border: #334155;
+            --accent: #f59e0b; --accent-light: #fbbf24;
+            --success: #10b981; --error: #ef4444; --warning: #f59e0b;
+            --text: #e2e8f0; --text-dim: #94a3b8;
+            --purple: #a78bfa; --purple-light: #c4b5fd;
+            --cyan: #06b6d4; --cyan-light: #67e8f9;
+        }
+        body { font-family: 'Fredoka', sans-serif; background: var(--bg-deep); color: var(--text); min-height: 100vh; line-height: 1.6; }
+        body::before {
+            content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            background:
+                radial-gradient(ellipse at 20% 30%, rgba(245,158,11,0.12) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 70%, rgba(6,182,212,0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(167,139,250,0.05) 0%, transparent 60%);
+        }
+        .container { max-width: 960px; margin: 0 auto; padding: 20px; position: relative; z-index: 1; }
+        a { color: var(--cyan); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        code { font-family: 'Space Mono', monospace; }
+
+        /* Hero */
+        .hero { text-align: center; padding: 50px 0 30px; }
+        .hero-badge {
+            display: inline-block; background: rgba(245,158,11,0.15); color: var(--accent);
+            padding: 4px 14px; border-radius: 20px; font-size: 0.8rem; font-family: 'Space Mono', monospace;
+            margin-bottom: 16px;
+        }
+        .hero h1 {
+            font-size: 2.6rem; font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-light), var(--cyan), var(--success));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .hero p { color: var(--text-dim); font-size: 1.05rem; margin-top: 10px; max-width: 650px; margin-left: auto; margin-right: auto; }
+        .hero-warn {
+            display: inline-block; margin-top: 16px; background: rgba(16,185,129,0.12); color: var(--success);
+            padding: 6px 16px; border-radius: 8px; font-size: 0.8rem; font-family: 'Space Mono', monospace;
+        }
+
+        /* Install Box */
+        .install-section { text-align: center; margin: 30px 0; }
+        .install-box {
+            display: inline-flex; align-items: center; gap: 12px;
+            background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+            padding: 14px 20px; max-width: 100%;
+        }
+        .install-box code { font-size: 0.85rem; color: var(--success); white-space: nowrap; }
+        .install-box button {
+            background: var(--accent); color: var(--bg-deep); border: none;
+            padding: 8px 18px; border-radius: 10px; cursor: pointer;
+            font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 0.85rem;
+            transition: background 0.2s; white-space: nowrap;
+        }
+        .install-box button:hover { background: var(--accent-light); }
+        .demo-btn {
+            display: inline-block; margin-top: 14px; background: var(--accent); color: var(--bg-deep);
+            padding: 10px 28px; border-radius: 12px; font-weight: 600; font-size: 0.95rem; transition: all 0.2s;
+        }
+        .demo-btn:hover { background: var(--accent-light); text-decoration: none; transform: translateY(-1px); }
+
+        /* Feature Grid */
+        .features { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin: 30px 0; }
+        .feature {
+            background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+            padding: 20px; transition: all 0.3s;
+        }
+        .feature:hover { background: var(--card-hover); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+        .feature-icon { font-size: 1.8rem; margin-bottom: 8px; }
+        .feature h3 { font-size: 1.05rem; color: var(--accent-light); margin-bottom: 6px; }
+        .feature p { font-size: 0.85rem; color: var(--text-dim); }
+
+        /* Sections */
+        .section { margin: 40px 0; }
+        .section h2 {
+            font-size: 1.4rem; text-align: center; margin-bottom: 20px;
+            background: linear-gradient(135deg, var(--accent-light), var(--cyan));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+
+        /* Architecture Box */
+        .arch-box {
+            background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+            padding: 24px; overflow-x: auto;
+        }
+        .arch-box pre {
+            font-family: 'Space Mono', monospace; font-size: 0.78rem;
+            color: var(--text-dim); line-height: 1.6; white-space: pre;
+        }
+        .arch-box .flow { color: var(--cyan); }
+        .arch-box .safe { color: var(--success); }
+        .arch-box .accent { color: var(--accent); }
+        .arch-box .purple { color: var(--purple); }
+
+        /* Table */
+        .info-table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        .info-table th {
+            background: var(--card); color: var(--accent-light); text-align: left;
+            padding: 10px 14px; border: 1px solid var(--border); font-size: 0.85rem;
+        }
+        .info-table td {
+            padding: 8px 14px; border: 1px solid var(--border); font-size: 0.85rem; color: var(--text-dim);
+        }
+        .info-table code { background: rgba(245,158,11,0.1); padding: 1px 6px; border-radius: 4px; font-size: 0.8rem; color: var(--accent); }
+
+        /* Screenshots / Mockups */
+        .screenshots { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin: 16px 0; }
+        .screenshot {
+            background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+            padding: 16px; text-align: center;
+        }
+        .screenshot .mock {
+            background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+            padding: 14px; margin-bottom: 10px; font-family: 'Space Mono', monospace;
+            font-size: 0.7rem; color: var(--text-dim); text-align: left; line-height: 1.6;
+        }
+        .screenshot .mock .h { color: var(--accent-light); font-weight: 700; }
+        .screenshot .mock .g { color: var(--success); }
+        .screenshot .mock .p { color: var(--purple); }
+        .screenshot .mock .c { color: var(--cyan); }
+        .screenshot .mock .w { color: var(--warning); }
+        .screenshot .caption { font-size: 0.8rem; color: var(--text-dim); }
+
+        /* Tech Stack Badges */
+        .tech-badges { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 20px 0; }
+        .tech-badge {
+            padding: 4px 14px; border-radius: 8px; font-size: 0.78rem; font-family: 'Space Mono', monospace;
+            border: 1px solid var(--border);
+        }
+        .tech-badge.python { background: rgba(6,182,212,0.1); color: var(--cyan); }
+        .tech-badge.react { background: rgba(6,182,212,0.1); color: var(--cyan-light); }
+        .tech-badge.fast { background: rgba(16,185,129,0.1); color: var(--success); }
+        .tech-badge.flutter { background: rgba(167,139,250,0.1); color: var(--purple); }
+        .tech-badge.db { background: rgba(245,158,11,0.1); color: var(--accent); }
+        .tech-badge.docker { background: rgba(6,182,212,0.1); color: var(--cyan); }
+
+        /* Roles */
+        .roles { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin: 16px 0; }
+        .role-card {
+            background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+            padding: 16px; text-align: center; transition: all 0.3s;
+        }
+        .role-card:hover { background: var(--card-hover); transform: translateY(-2px); }
+        .role-card .role-icon { font-size: 2rem; margin-bottom: 8px; }
+        .role-card h4 { color: var(--accent-light); font-size: 0.95rem; margin-bottom: 4px; }
+        .role-card p { font-size: 0.78rem; color: var(--text-dim); }
+
+        /* Footer */
+        footer {
+            text-align: center; margin-top: 50px; padding: 20px 0;
+            border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.8rem;
+        }
+        footer a { color: var(--cyan); }
+
+        @media (max-width: 600px) {
+            .hero h1 { font-size: 1.8rem; }
+            .features { grid-template-columns: 1fr; }
+            .screenshots { grid-template-columns: 1fr; }
+            .roles { grid-template-columns: 1fr 1fr; }
+            .install-box { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Hero -->
+        <div class="hero">
+            <span class="hero-badge">🏥 HR-MANAGEMENT FÜR KLINIKEN</span>
+            <h1>Mitarbeiterverwaltung</h1>
+            <p>Komplettes HR-System für Kliniken: Personalverwaltung, Zeiterfassung, Schichtplanung, Urlaubsmanagement, Abrechnung und KI-Support — alles in einer Plattform.</p>
+            <span class="hero-warn">✅ Produktiv im Einsatz</span>
+        </div>
+
+        <!-- Deploy -->
+        <div class="install-section">
+            <div class="install-box">
+                <code>python deploy.py</code>
+                <button onclick="copyCmd(this)">Kopieren</button>
+            </div>
+            <br>
+            <a href="https://mva.c3po42.de" class="demo-btn">Live-System öffnen →</a>
+        </div>
+
+        <!-- Tech Badges -->
+        <div class="tech-badges">
+            <span class="tech-badge fast">FastAPI</span>
+            <span class="tech-badge react">React 19</span>
+            <span class="tech-badge flutter">Flutter</span>
+            <span class="tech-badge db">PostgreSQL</span>
+            <span class="tech-badge db">Redis</span>
+            <span class="tech-badge docker">Docker</span>
+            <span class="tech-badge python">JWT Auth</span>
+        </div>
+
+        <!-- Features Grid (8 Features) -->
+        <div class="section">
+            <h2>Features</h2>
+        </div>
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">👥</div>
+                <h3>Personalverwaltung</h3>
+                <p>Komplette Mitarbeiterstammdaten mit Abteilungszuordnung, Qualifikationen, Dokumenten und Vertragsdetails. Import und Export per Excel.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">⏱️</div>
+                <h3>Zeiterfassung</h3>
+                <p>Stempeluhr mit Ein-/Ausstempeln, Pausenerfassung und automatischer Stundenberechnung. Monatsübersichten und Soll-/Ist-Vergleich.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">📅</div>
+                <h3>Schichtplanung</h3>
+                <p>Jahres-Dienstplanung nach Excel-Vorbild plus Monatsplanung. Urlaub, Bereitschaft, Hotline, Schulungen und Teamtermine per Drag-and-Drop planen.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🏖️</div>
+                <h3>Urlaubsverwaltung</h3>
+                <p>Digitale Urlaubsanträge mit Genehmigungsworkflow. Resturlaub, Übertrag, Vertretungsregelung und Teamkalender auf einen Blick.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">💰</div>
+                <h3>Abrechnung</h3>
+                <p>Zuschläge, Überstunden, Schichtzulagen automatisch berechnet. Monatliche Abrechnungsübersicht und Export für die Lohnbuchhaltung.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🤖</div>
+                <h3>KI-Support-Bot</h3>
+                <p>Integrierter Chat mit KI-Assistent (Claudi). Beantwortet Fragen zu HR-Prozessen, Resturlaub, Schichtplänen und Unternehmensrichtlinien.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">📊</div>
+                <h3>Berichte & Export</h3>
+                <p>Excel-Reports für Arbeitszeiten, Abwesenheiten, Überstunden und Personalkosten. Abteilungsweise Auswertungen und Dashboards.</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🎫</div>
+                <h3>Ticketing-System</h3>
+                <p>IT- und HR-Tickets direkt im System erstellen und verwalten. Kategorien, Prioritäten, Zuweisung und Status-Tracking.</p>
+            </div>
+        </div>
+
+        <!-- Rollen-System -->
+        <div class="section">
+            <h2>Rollensystem</h2>
+        </div>
+        <div class="roles">
+            <div class="role-card">
+                <div class="role-icon">👑</div>
+                <h4>Admin</h4>
+                <p>Vollzugriff auf alle Module, Benutzerverwaltung, Systemkonfiguration</p>
+            </div>
+            <div class="role-card">
+                <div class="role-icon">📋</div>
+                <h4>HR</h4>
+                <p>Personalverwaltung, Abrechnung, Berichte, Urlaubsgenehmigung</p>
+            </div>
+            <div class="role-card">
+                <div class="role-icon">🏢</div>
+                <h4>Abteilungsleiter</h4>
+                <p>Schichtplanung, Teamübersicht, Urlaubsgenehmigung eigene Abteilung</p>
+            </div>
+            <div class="role-card">
+                <div class="role-icon">👤</div>
+                <h4>Mitarbeiter</h4>
+                <p>Eigene Zeiten, Urlaubsanträge, Chat, Profilbearbeitung</p>
+            </div>
+        </div>
+
+        <!-- Architektur -->
+        <div class="section">
+            <h2>Architektur</h2>
+            <div class="arch-box">
+<pre>
+<span class="accent">Browser / App</span>
+       │
+       ▼
+<span class="flow">┌──────────────────────────────────────────┐</span>
+<span class="flow">│  Nginx Reverse Proxy (:8090)             │</span>
+<span class="flow">└──────────┬──────────────┬────────────────┘</span>
+           │              │
+     <span class="safe">/api/*</span>         <span class="purple">/*</span>
+           │              │
+           ▼              ▼
+<span class="safe">┌─────────────────┐  ┌─────────────────┐</span>
+<span class="safe">│ FastAPI (:8000)  │  │ React Frontend  │</span>
+<span class="safe">│ REST API + JWT   │  │ TypeScript/Vite │</span>
+<span class="safe">└────────┬────────┘  └─────────────────┘</span>
+         │
+    ┌────┴────┐
+    ▼         ▼
+<span class="accent">┌────────┐ ┌───────┐</span>
+<span class="accent">│ Postgres│ │ Redis │</span>
+<span class="accent">│ :5432  │ │ :6379 │</span>
+<span class="accent">└────────┘ └───────┘</span>
+         │
+         ▼
+<span class="purple">┌─────────────────┐</span>
+<span class="purple">│ Claudi KI-Bot   │</span>
+<span class="purple">│ Claude Opus 4.6 │</span>
+<span class="purple">└─────────────────┘</span>
+</pre>
+            </div>
+        </div>
+
+        <!-- API-Tabelle -->
+        <div class="section">
+            <h2>API-Referenz</h2>
+            <table class="info-table">
+                <thead>
+                    <tr>
+                        <th>Methode</th>
+                        <th>Endpoint</th>
+                        <th>Beschreibung</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>POST</code></td>
+                        <td><code>/api/auth/login</code></td>
+                        <td>JWT-Login (Username + Passwort)</td>
+                    </tr>
+                    <tr>
+                        <td><code>GET</code></td>
+                        <td><code>/api/employees</code></td>
+                        <td>Mitarbeiterliste (paginiert, filterbar)</td>
+                    </tr>
+                    <tr>
+                        <td><code>POST</code></td>
+                        <td><code>/api/time-tracking/clock-in</code></td>
+                        <td>Einstempeln mit Timestamp</td>
+                    </tr>
+                    <tr>
+                        <td><code>GET</code></td>
+                        <td><code>/api/shifts/schedule</code></td>
+                        <td>Schichtplan einer Abteilung</td>
+                    </tr>
+                    <tr>
+                        <td><code>GET</code></td>
+                        <td><code>/api/v1/shifts/duty-plan</code></td>
+                        <td>Jahres-Dienstplanung laden</td>
+                    </tr>
+                    <tr>
+                        <td><code>PUT</code></td>
+                        <td><code>/api/v1/shifts/duty-plan/cells</code></td>
+                        <td>Tagescodes speichern oder leeren</td>
+                    </tr>
+                    <tr>
+                        <td><code>POST</code></td>
+                        <td><code>/api/vacation/request</code></td>
+                        <td>Urlaubsantrag einreichen</td>
+                    </tr>
+                    <tr>
+                        <td><code>GET</code></td>
+                        <td><code>/api/reports/monthly</code></td>
+                        <td>Monatsbericht als Excel-Export</td>
+                    </tr>
+                    <tr>
+                        <td><code>POST</code></td>
+                        <td><code>/api/chat/message</code></td>
+                        <td>Nachricht an KI-Support-Bot</td>
+                    </tr>
+                    <tr>
+                        <td><code>GET</code></td>
+                        <td><code>/api/tickets</code></td>
+                        <td>Ticketliste mit Status und Priorität</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Screenshots / Mockups -->
+        <div class="section">
+            <h2>Oberfläche</h2>
+            <div class="screenshots">
+                <div class="screenshot">
+                    <div class="mock">
+<span class="h">━━━ Dashboard ━━━</span>
+<span class="g">● 127 Mitarbeiter aktiv</span>
+<span class="c">● 12 im Urlaub</span>
+<span class="w">● 3 Krankmeldungen</span>
+<span class="p">● 5 offene Anträge</span>
+
+<span class="h">Heute anwesend:</span>
+<span class="g">██████████████ 89%</span>
+                    </div>
+                    <div class="caption">Dashboard — Tagesübersicht</div>
+                </div>
+                <div class="screenshot">
+                    <div class="mock">
+<span class="h">━━━ Schichtplan ━━━</span>
+        Mo  Di  Mi  Do  Fr
+<span class="g">Müller  F   F   S   S   -</span>
+<span class="c">Schmidt S   S   F   F   N</span>
+<span class="p">Weber   N   -   -   F   F</span>
+<span class="w">Koch    -   N   N   S   S</span>
+
+<span class="g">F</span>=Früh <span class="c">S</span>=Spät <span class="p">N</span>=Nacht
+                    </div>
+                    <div class="caption">Schichtplanung — Wochenansicht</div>
+                </div>
+                <div class="screenshot">
+                    <div class="mock">
+<span class="h">━━━ KI-Chat ━━━</span>
+<span class="c">Du:</span> Wie viel Resturlaub habe
+     ich noch?
+
+<span class="p">🤖 Claudi:</span> Du hast noch
+  <span class="g">12 Tage</span> Resturlaub in 2026.
+  Davon sind <span class="w">3 Tage</span> aus dem
+  Vorjahr übertragen.
+                    </div>
+                    <div class="caption">KI-Support-Bot — Claudi</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tech Stack -->
+        <div class="section">
+            <h2>Tech-Stack</h2>
+            <div class="features" style="grid-template-columns: 1fr 1fr;">
+                <div class="feature">
+                    <h3>Backend</h3>
+                    <p style="font-family: 'Space Mono', monospace; font-size: 0.78rem;">
+                        Python 3.11 + FastAPI<br>
+                        SQLAlchemy ORM<br>
+                        PostgreSQL 15<br>
+                        Redis (Sessions/Cache)<br>
+                        JWT Authentication<br>
+                        Alembic Migrations
+                    </p>
+                </div>
+                <div class="feature">
+                    <h3>Frontend & Mobile</h3>
+                    <p style="font-family: 'Space Mono', monospace; font-size: 0.78rem;">
+                        React 19 + TypeScript<br>
+                        Vite Build-Tool<br>
+                        Material UI<br>
+                        Flutter (Android-App)<br>
+                        Auto-Update-Mechanismus<br>
+                        Responsive Design
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p>MVA — Mitarbeiterverwaltung · IKK Kliniken IT · <a href="https://mva.c3po42.de">mva.c3po42.de</a></p>
+            <p><a href="https://mva.c3po42.de">Login</a> · <a href="https://bots.c3po42.de">Bot Dashboard</a> · <a href="https://downloads.c3po42.de">Downloads</a></p>
+        </footer>
+    </div>
+
+    <script>
+    function copyCmd(btn) {
+        const code = btn.parentElement.querySelector('code').textContent;
+        navigator.clipboard.writeText(code).then(() => {
+            btn.textContent = 'Kopiert!';
+            setTimeout(() => btn.textContent = 'Kopieren', 2000);
+        });
+    }
+    </script>
+</body>
+</html>

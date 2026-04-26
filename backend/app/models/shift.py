@@ -2,7 +2,7 @@ from datetime import datetime, date, time
 from enum import Enum
 from typing import Optional
 
-from sqlalchemy import Date, ForeignKey, JSON, String, Time
+from sqlalchemy import Date, ForeignKey, JSON, String, Time, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -116,6 +116,37 @@ class ShiftAssignment(Base):
 
     def __repr__(self) -> str:
         return f"<ShiftAssignment {self.employee_id} {self.date} {self.shift_template_id}>"
+
+
+class DutyPlanEntry(Base):
+    """Jahres-Dienstplanungscode fuer einen Mitarbeiter an einem Kalendertag."""
+    __tablename__ = "duty_plan_entries"
+    __table_args__ = (
+        UniqueConstraint("employee_id", "date", name="uq_duty_plan_employee_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"), index=True)
+    date: Mapped[date] = mapped_column(Date, index=True)
+    code: Mapped[str] = mapped_column(String(8))
+    note: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    created_by: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("employees.id"), nullable=True
+    )
+    updated_by: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("employees.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    employee = relationship("Employee", foreign_keys=[employee_id], lazy="selectin")
+    creator = relationship("Employee", foreign_keys=[created_by], lazy="selectin")
+    updater = relationship("Employee", foreign_keys=[updated_by], lazy="selectin")
+
+    def __repr__(self) -> str:
+        return f"<DutyPlanEntry {self.employee_id} {self.date} {self.code}>"
 
 
 class ShiftRequirement(Base):
