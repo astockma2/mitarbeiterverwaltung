@@ -18,6 +18,12 @@ from app.models.shift import (
     CoverageRequest,
     SwapRequest,
 )
+from app.models.planning import (
+    PlanningMarker,
+    PlanningMarkerKind,
+    TravelRequest,
+    TravelStatus,
+)
 from app.models.message import (
     Conversation,
     ConversationMember,
@@ -42,6 +48,10 @@ __all__ = [
     "ShiftRequirement",
     "CoverageRequest",
     "SwapRequest",
+    "PlanningMarker",
+    "PlanningMarkerKind",
+    "TravelRequest",
+    "TravelStatus",
     "Conversation",
     "ConversationMember",
     "Message",

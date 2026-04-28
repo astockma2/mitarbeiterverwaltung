@@ -16,6 +16,7 @@ from app.api.time_tracking import router as time_router
 from app.api.absences import router as absences_router
 from app.api.monthly_closing import router as monthly_router
 from app.api.shifts import router as shifts_router
+from app.api.planning import router as planning_router
 from app.api.chat import router as chat_router
 from app.api.reports import router as reports_router
 from app.api.tickets import router as tickets_router
@@ -86,6 +87,7 @@ app.include_router(time_router, prefix=API_PREFIX)
 app.include_router(absences_router, prefix=API_PREFIX)
 app.include_router(monthly_router, prefix=API_PREFIX)
 app.include_router(shifts_router, prefix=API_PREFIX)
+app.include_router(planning_router, prefix=API_PREFIX)
 app.include_router(chat_router, prefix=API_PREFIX)
 app.include_router(reports_router, prefix=API_PREFIX)
 app.include_router(tickets_router, prefix=API_PREFIX)

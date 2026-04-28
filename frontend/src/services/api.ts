@@ -86,6 +86,31 @@ export const saveDutyPlanCells = (
   entries: Array<{ employee_id: number; date: string; code: string | null; note?: string | null }>
 ) => api.put('/shifts/duty-plan/cells', { entries });
 
+// Planning
+export const getPlanningCalendar = (params: {
+  start_date: string;
+  end_date: string;
+  department_id?: number | string;
+}) => api.get('/planning/calendar', { params });
+export const createTravelRequest = (data: {
+  employee_id?: number;
+  start_date: string;
+  end_date: string;
+  destination: string;
+  purpose: string;
+  cost_center?: string;
+  transport_type?: string;
+  estimated_costs?: number | null;
+}) => api.post('/planning/travel-requests', data);
+export const getTravelRequests = (params?: Record<string, any>) =>
+  api.get('/planning/travel-requests', { params });
+export const getPendingTravelRequests = () =>
+  api.get('/planning/travel-requests/pending');
+export const reviewTravelRequest = (
+  id: number,
+  data: { approved: boolean; final_approval?: boolean; notes?: string }
+) => api.post(`/planning/travel-requests/${id}/review`, data);
+
 // Admin
 export const getDashboard = () => api.get('/admin/dashboard');
 

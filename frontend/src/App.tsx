@@ -48,7 +48,7 @@ export default function App() {
             {isHR && <Route path="/employees" element={<Employees />} />}
             <Route path="/employees/:id" element={<EmployeeDetail isHR={isHR} />} />
             {isHR && <Route path="/departments" element={<Departments />} />}
-            {isManager && <Route path="/shift-plans" element={<DutyPlanning />} />}
+            {isManager && <Route path="/shift-plans" element={<DutyPlanning isHR={isHR} />} />}
             {isManager && <Route path="/shift-plans/monthly" element={<ShiftPlans />} />}
             {isHR && <Route path="/monthly-closing" element={<MonthlyClosingPage />} />}
             {isHR && <Route path="/reports" element={<Reports />} />}

@@ -1,23 +1,24 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, MouseEvent, ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { CSSProperties, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import {
   CalendarDays,
+  Check,
   ChevronLeft,
   ChevronRight,
-  Download,
-  Eraser,
-  Paintbrush,
-  Save,
-  Search,
+  Plane,
+  RefreshCw,
   Table2,
+  X,
 } from 'lucide-react';
-import Card from '../components/Card';
-import { getDutyPlan, getEmployees, saveDutyPlanCells } from '../services/api';
-
-const DAY_WIDTH = 28;
-const NAME_WIDTH = 190;
-const BALANCE_WIDTH = 68;
+import Card, { Badge } from '../components/Card';
+import {
+  createTravelRequest,
+  getDepartments,
+  getPendingTravelRequests,
+  getPlanningCalendar,
+  reviewTravelRequest,
+} from '../services/api';
 
 const MONTH_NAMES = [
   'Januar',
@@ -35,772 +36,770 @@ const MONTH_NAMES = [
 ];
 
 const WEEKDAY_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+const DAY_WIDTH = 34;
+const NAME_WIDTH = 190;
 
-const DUTY_CODE_OPTIONS = [
-  { code: 'U', label: 'Urlaub', cellText: 'U', background: '#ffd42a', color: '#111827' },
-  { code: 'Ug', label: 'Urlaub geplant', cellText: 'Ug', background: '#12a8e0', color: '#ffffff' },
-  { code: 'A', label: 'Arbeitszeitausgleich', cellText: 'A', background: '#ff6b7a', color: '#111827' },
-  { code: 'S', label: 'Schulung', cellText: 'S', background: '#006db6', color: '#ffffff' },
-  { code: 'B', label: 'Bereitschaft', cellText: 'B', background: '#d45a1c', color: '#ffffff' },
-  { code: 'I', label: 'Ilmenau', cellText: 'I', background: '#fff0ed', color: '#111827' },
-  { code: 'H', label: 'Hotlinedienst', cellText: 'H', background: '#00b75a', color: '#ffffff' },
-  { code: 'M', label: 'MVZ', cellText: 'M', background: '#f7eb00', color: '#111827' },
-  { code: 'Dr', label: 'Dienstreisen', cellText: 'DR', background: '#b7e4a2', color: '#111827' },
-  { code: 'K', label: 'Kur', cellText: 'K', background: '#ffc86f', color: '#111827' },
-  { code: 'su', label: 'security update day', cellText: 'su', background: '#ff9aa8', color: '#111827' },
-  { code: 'T', label: 'Teammeeting', cellText: 'T', background: '#0713c9', color: '#ffffff' },
-  { code: 'Ez', label: 'Elternzeit', cellText: 'Ez', background: '#f4c04d', color: '#111827' },
-  { code: 'TSC', label: 'Zeitreduzierung TSC', cellText: '', background: '#315d1e', color: '#ffffff' },
-] as const;
+type ViewMode = 'year' | 'month';
 
-type DutyCode = (typeof DUTY_CODE_OPTIONS)[number]['code'];
-type ActiveTool = DutyCode | 'erase';
-type SaveState = 'idle' | 'saving' | 'saved' | 'error';
+type PlanningEvent = {
+  id: number;
+  type: string;
+  code: string;
+  label: string;
+  status: string;
+  color: string;
+  source?: string | null;
+};
 
-type DutyPlanEntry = {
+type PlanningDay = {
+  date: string;
+  events: PlanningEvent[];
+};
+
+type PlanningEmployee = {
+  id: number;
+  name: string;
+  department_id?: number | null;
+  department_name?: string | null;
+  vacation_days_per_year: number;
+  days: PlanningDay[];
+};
+
+type PlanningCalendar = {
+  start_date: string;
+  end_date: string;
+  days: string[];
+  employees: PlanningEmployee[];
+};
+
+type TravelRequest = {
   id: number;
   employee_id: number;
-  date: string;
-  code: string;
-  note?: string | null;
+  employee_name?: string | null;
+  start_date: string;
+  end_date: string;
+  destination: string;
+  purpose: string;
+  status: string;
 };
 
-type EmployeeItem = {
+type Department = {
   id: number;
-  first_name: string;
-  last_name: string;
-  department_name?: string | null;
-  vacation_days_per_year?: number | null;
+  name: string;
 };
 
-type DayInfo = {
-  date: Date;
-  key: string;
-  month: number;
-  day: number;
-  weekday: number;
-  week: number;
+type Props = {
+  isHR: boolean;
 };
 
-type DutyAssignments = Record<number, Record<string, DutyCode>>;
-type DutyCellUpdate = { employee_id: number; date: string; code: DutyCode | null };
-
-const DUTY_CODE_MAP = DUTY_CODE_OPTIONS.reduce(
-  (acc, option) => ({ ...acc, [option.code]: option }),
-  {} as Record<DutyCode, (typeof DUTY_CODE_OPTIONS)[number]>
-);
-
-const VACATION_CODES = new Set<DutyCode>(['U', 'Ug']);
-
-const tableHeaderCell: CSSProperties = {
-  border: '1px solid #cbd5e1',
-  padding: 0,
-  height: 24,
-  fontSize: 11,
-  fontWeight: 700,
-  color: '#0f172a',
-  background: '#f8fafc',
-  textAlign: 'center',
-  whiteSpace: 'nowrap',
-};
-
-const stickyColumnBase: CSSProperties = {
-  position: 'sticky',
-  zIndex: 4,
-  border: '1px solid #cbd5e1',
-  background: '#ffffff',
+const STATUS_LABELS: Record<string, string> = {
+  REQUESTED: 'Beantragt',
+  MANAGER_APPROVED: 'Fachlich frei',
+  APPROVED: 'Genehmigt',
+  APPROVED_LEGACY: 'Importiert',
+  REJECTED: 'Abgelehnt',
+  CANCELLED: 'Storniert',
+  PLANNED: 'Geplant',
+  CONFIRMED: 'Bestaetigt',
+  IMPORTED: 'Importiert',
 };
 
 function pad(value: number) {
   return String(value).padStart(2, '0');
 }
 
-function toDateKey(date: Date) {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
-function getIsoWeek(date: Date) {
-  const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const day = utcDate.getUTCDay() || 7;
-  utcDate.setUTCDate(utcDate.getUTCDate() + 4 - day);
-  const yearStart = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1));
-  return Math.ceil((((utcDate.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-}
-
-function getDaysForYear(year: number): DayInfo[] {
-  const days: DayInfo[] = [];
-  const cursor = new Date(year, 0, 1);
-  while (cursor.getFullYear() === year) {
-    days.push({
-      date: new Date(cursor),
-      key: toDateKey(cursor),
-      month: cursor.getMonth(),
-      day: cursor.getDate(),
-      weekday: cursor.getDay(),
-      week: getIsoWeek(cursor),
-    });
-    cursor.setDate(cursor.getDate() + 1);
-  }
-  return days;
+function dateKey(year: number, month: number, day: number) {
+  return `${year}-${pad(month)}-${pad(day)}`;
 }
 
 function daysInMonth(year: number, month: number) {
-  return new Date(year, month + 1, 0).getDate();
+  return new Date(year, month, 0).getDate();
 }
 
-function isDutyCode(code: string): code is DutyCode {
-  return Object.prototype.hasOwnProperty.call(DUTY_CODE_MAP, code);
+function localDate(value: string) {
+  return new Date(`${value}T00:00:00`);
 }
 
-function getEmployeeName(employee: EmployeeItem) {
-  return `${employee.first_name} ${employee.last_name}`.trim();
-}
-
-function getErrorMessage(error: unknown, fallback: string) {
-  const response = (error as { response?: { data?: { detail?: string } } }).response;
-  return response?.data?.detail || fallback;
-}
-
-function isWeekend(day: DayInfo) {
-  return day.weekday === 0 || day.weekday === 6;
-}
-
-function isHolidayBand(day: DayInfo) {
-  const key = day.key;
-  return (
-    (key >= '2026-01-01' && key <= '2026-01-03') ||
-    (key >= '2026-02-16' && key <= '2026-02-21') ||
-    (key >= '2026-03-30' && key <= '2026-04-10') ||
-    (key >= '2026-07-06' && key <= '2026-08-14') ||
-    (key >= '2026-10-12' && key <= '2026-10-24') ||
-    (key >= '2026-12-23' && key <= '2026-12-31')
-  );
-}
-
-function escapeCsv(value: string | number) {
-  const raw = String(value);
-  if (raw.includes(';') || raw.includes('"') || raw.includes('\n')) {
-    return `"${raw.replaceAll('"', '""')}"`;
+function getRange(mode: ViewMode, year: number, month: number) {
+  if (mode === 'year') {
+    return { start: `${year}-01-01`, end: `${year}-12-31` };
   }
-  return raw;
+  return {
+    start: dateKey(year, month, 1),
+    end: dateKey(year, month, daysInMonth(year, month)),
+  };
 }
 
-export default function DutyPlanning() {
-  const [year, setYear] = useState(2026);
-  const [employees, setEmployees] = useState<EmployeeItem[]>([]);
-  const [assignments, setAssignments] = useState<DutyAssignments>({});
-  const [activeTool, setActiveTool] = useState<ActiveTool>('U');
-  const [search, setSearch] = useState('');
+function isWeekend(value: string) {
+  const day = localDate(value).getDay();
+  return day === 0 || day === 6;
+}
+
+function eventTitle(event: PlanningEvent) {
+  const status = STATUS_LABELS[event.status] || event.status;
+  return `${event.code} - ${event.label} (${status})`;
+}
+
+function groupMonthHeaders(days: string[]) {
+  const groups: Array<{ month: number; label: string; count: number }> = [];
+  for (const day of days) {
+    const month = localDate(day).getMonth();
+    const last = groups[groups.length - 1];
+    if (last?.month === month) {
+      last.count += 1;
+    } else {
+      groups.push({ month, label: MONTH_NAMES[month], count: 1 });
+    }
+  }
+  return groups;
+}
+
+export default function DutyPlanning({ isHR }: Props) {
+  const today = new Date();
+  const [mode, setMode] = useState<ViewMode>('year');
+  const [year, setYear] = useState(today.getFullYear());
+  const [month, setMonth] = useState(today.getMonth() + 1);
+  const [departmentId, setDepartmentId] = useState('');
+  const [calendar, setCalendar] = useState<PlanningCalendar | null>(null);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [pendingTravel, setPendingTravel] = useState<TravelRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [saveState, setSaveState] = useState<SaveState>('idle');
-  const [stagedCount, setStagedCount] = useState(0);
+  const [travelForm, setTravelForm] = useState({
+    employee_id: '',
+    start_date: dateKey(today.getFullYear(), today.getMonth() + 1, today.getDate()),
+    end_date: dateKey(today.getFullYear(), today.getMonth() + 1, today.getDate()),
+    destination: '',
+    purpose: '',
+    cost_center: '',
+    transport_type: '',
+    estimated_costs: '',
+  });
 
-  const isPainting = useRef(false);
-  const stagedCells = useRef<Map<string, DutyCellUpdate>>(new Map());
+  const range = useMemo(() => getRange(mode, year, month), [mode, year, month]);
 
-  const days = useMemo(() => getDaysForYear(year), [year]);
-  const monthHeaders = useMemo(
-    () => MONTH_NAMES.map((name, month) => ({ name, month, days: daysInMonth(year, month) })),
-    [year]
-  );
-
-  const filteredEmployees = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    if (!term) return employees;
-    return employees.filter((employee) => {
-      const name = getEmployeeName(employee).toLowerCase();
-      const department = employee.department_name?.toLowerCase() || '';
-      return name.includes(term) || department.includes(term);
-    });
-  }, [employees, search]);
-
-  const loadPlanner = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const [employeeResponse, planResponse] = await Promise.all([
-        getEmployees({ page_size: 500, is_active: true }),
-        getDutyPlan(year),
+      const params: { start_date: string; end_date: string; department_id?: string } = {
+        start_date: range.start,
+        end_date: range.end,
+      };
+      if (departmentId) params.department_id = departmentId;
+      const [calendarResponse, pendingResponse] = await Promise.all([
+        getPlanningCalendar(params),
+        getPendingTravelRequests().catch(() => ({ data: [] })),
       ]);
-      const nextAssignments: DutyAssignments = {};
-      const entries = planResponse.data.entries as DutyPlanEntry[];
-
-      for (const entry of entries) {
-        if (!isDutyCode(entry.code)) continue;
-        nextAssignments[entry.employee_id] = {
-          ...(nextAssignments[entry.employee_id] || {}),
-          [entry.date]: entry.code,
-        };
-      }
-
-      setEmployees(employeeResponse.data.items as EmployeeItem[]);
-      setAssignments(nextAssignments);
-      setSaveState('idle');
-    } catch (loadError) {
-      setError(getErrorMessage(loadError, 'Dienstplanung konnte nicht geladen werden'));
+      setCalendar(calendarResponse.data as PlanningCalendar);
+      setPendingTravel(pendingResponse.data as TravelRequest[]);
+    } catch (loadError: any) {
+      setError(loadError.response?.data?.detail || 'Planung konnte nicht geladen werden');
     } finally {
       setLoading(false);
     }
-  }, [year]);
+  }, [departmentId, range.end, range.start]);
 
-  const commitPaint = useCallback(async () => {
-    const entries = Array.from(stagedCells.current.values());
-    if (entries.length === 0) return;
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-    stagedCells.current.clear();
-    setStagedCount(0);
-    setSaveState('saving');
-    try {
-      await saveDutyPlanCells(entries);
-      setSaveState('saved');
-    } catch (saveError) {
-      setSaveState('error');
-      setError(getErrorMessage(saveError, 'Dienstplan-Zellen konnten nicht gespeichert werden'));
-      await loadPlanner();
+  useEffect(() => {
+    if (!isHR) return;
+    getDepartments()
+      .then((response) => setDepartments(response.data as Department[]))
+      .catch(() => setDepartments([]));
+  }, [isHR]);
+
+  const employees = calendar?.employees || [];
+  const days = calendar?.days || [];
+  const monthHeaders = useMemo(() => groupMonthHeaders(days), [days]);
+
+  const setPrevious = () => {
+    if (mode === 'year') {
+      setYear((current) => current - 1);
+      return;
     }
-  }, [loadPlanner]);
-
-  useEffect(() => {
-    void loadPlanner();
-  }, [loadPlanner]);
-
-  useEffect(() => {
-    const stopPainting = () => {
-      if (!isPainting.current) return;
-      isPainting.current = false;
-      void commitPaint();
-    };
-    window.addEventListener('mouseup', stopPainting);
-    return () => window.removeEventListener('mouseup', stopPainting);
-  }, [commitPaint]);
-
-  const stageCell = (employeeId: number, dateKey: string, code: DutyCode | null) => {
-    const key = `${employeeId}:${dateKey}`;
-    const currentCode = assignments[employeeId]?.[dateKey] || null;
-    if (currentCode === code && !stagedCells.current.has(key)) return;
-
-    stagedCells.current.set(key, { employee_id: employeeId, date: dateKey, code });
-    setStagedCount(stagedCells.current.size);
-    setSaveState('idle');
-
-    setAssignments((current) => {
-      const row = { ...(current[employeeId] || {}) };
-      if (code) {
-        row[dateKey] = code;
-      } else {
-        delete row[dateKey];
-      }
-      return { ...current, [employeeId]: row };
-    });
+    if (month === 1) {
+      setYear((current) => current - 1);
+      setMonth(12);
+      return;
+    }
+    setMonth((current) => current - 1);
   };
 
-  const paintCell = (employeeId: number, dateKey: string) => {
-    stageCell(employeeId, dateKey, activeTool === 'erase' ? null : activeTool);
+  const setNext = () => {
+    if (mode === 'year') {
+      setYear((current) => current + 1);
+      return;
+    }
+    if (month === 12) {
+      setYear((current) => current + 1);
+      setMonth(1);
+      return;
+    }
+    setMonth((current) => current + 1);
   };
 
-  const handleCellMouseDown = (
-    employeeId: number,
-    dateKey: string,
-    event: MouseEvent<HTMLTableCellElement>
-  ) => {
+  const openMonth = (day: string) => {
+    const parsed = localDate(day);
+    setYear(parsed.getFullYear());
+    setMonth(parsed.getMonth() + 1);
+    setMode('month');
+  };
+
+  const submitTravel = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (loading) return;
-    isPainting.current = true;
-    paintCell(employeeId, dateKey);
+    setError('');
+    try {
+      await createTravelRequest({
+        employee_id: travelForm.employee_id ? Number(travelForm.employee_id) : undefined,
+        start_date: travelForm.start_date,
+        end_date: travelForm.end_date,
+        destination: travelForm.destination,
+        purpose: travelForm.purpose,
+        cost_center: travelForm.cost_center || undefined,
+        transport_type: travelForm.transport_type || undefined,
+        estimated_costs: travelForm.estimated_costs ? Number(travelForm.estimated_costs) : null,
+      });
+      setTravelForm((current) => ({
+        ...current,
+        destination: '',
+        purpose: '',
+        cost_center: '',
+        transport_type: '',
+        estimated_costs: '',
+      }));
+      await load();
+    } catch (submitError: any) {
+      setError(submitError.response?.data?.detail || 'Dienstreise konnte nicht gespeichert werden');
+    }
   };
 
-  const handleCellMouseEnter = (employeeId: number, dateKey: string) => {
-    if (!isPainting.current || loading) return;
-    paintCell(employeeId, dateKey);
+  const reviewTravel = async (id: number, approved: boolean) => {
+    await reviewTravelRequest(id, { approved, final_approval: isHR });
+    await load();
   };
 
-  const handleCellContextMenu = (
-    employeeId: number,
-    dateKey: string,
-    event: MouseEvent<HTMLTableCellElement>
-  ) => {
-    event.preventDefault();
-    stageCell(employeeId, dateKey, null);
-    void commitPaint();
-  };
-
-  const plannedVacationDays = (employeeId: number) => {
-    const row = assignments[employeeId] || {};
-    return Object.values(row).filter((code) => VACATION_CODES.has(code)).length;
-  };
-
-  const remainingVacationDays = (employee: EmployeeItem) => {
-    const entitlement = employee.vacation_days_per_year ?? 30;
-    return Math.max(0, entitlement - plannedVacationDays(employee.id));
-  };
-
-  const exportCsv = () => {
-    const header = ['Name', 'Rest 2025', String(year), ...days.map((day) => day.key)];
-    const rows = filteredEmployees.map((employee) => [
-      getEmployeeName(employee),
-      '0',
-      String(remainingVacationDays(employee)),
-      ...days.map((day) => assignments[employee.id]?.[day.key] || ''),
-    ]);
-    const csv = [header, ...rows]
-      .map((row) => row.map((value) => escapeCsv(value)).join(';'))
-      .join('\n');
-    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `dienstplanung-${year}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const totalVacation = filteredEmployees.reduce(
-    (sum, employee) => sum + plannedVacationDays(employee.id),
+  const title = mode === 'year' ? String(year) : `${MONTH_NAMES[month - 1]} ${year}`;
+  const totalEvents = employees.reduce(
+    (sum, employee) => sum + employee.days.reduce((daySum, day) => daySum + day.events.length, 0),
     0
   );
-  const totalReadiness = filteredEmployees.reduce((sum, employee) => {
-    const row = assignments[employee.id] || {};
-    return sum + Object.values(row).filter((code) => code === 'B').length;
-  }, 0);
-
-  const activeOption = activeTool === 'erase' ? null : DUTY_CODE_MAP[activeTool];
-  const tableMinWidth = NAME_WIDTH + BALANCE_WIDTH * 2 + days.length * DAY_WIDTH;
+  const totalTravel = employees.reduce(
+    (sum, employee) =>
+      sum + employee.days.reduce((daySum, day) => daySum + day.events.filter((item) => item.type === 'travel').length, 0),
+    0
+  );
 
   return (
     <div>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        gap: 16,
-        marginBottom: 18,
-        flexWrap: 'wrap',
-      }}>
+      <div style={topbarStyle}>
         <div>
-          <h1 style={{
-            margin: 0,
-            fontSize: 24,
-            color: '#1e293b',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-          }}>
+          <h1 style={headingStyle}>
             <CalendarDays size={24} />
             Dienstplanung
           </h1>
           <div style={{ marginTop: 6, color: '#64748b', fontSize: 13 }}>
-            Jahresuebersicht mit Urlaub, Bereitschaft, Hotline, Schulungen und Teamterminen
+            {title}
           </div>
         </div>
-        <Link
-          to="/shift-plans/monthly"
-          title="Zur bisherigen Monatsplanung"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '9px 12px',
-            border: '1px solid #cbd5e1',
-            borderRadius: 8,
-            color: '#334155',
-            background: '#ffffff',
-            textDecoration: 'none',
-            fontSize: 13,
-            fontWeight: 600,
-          }}
-        >
+        <Link to="/shift-plans/monthly" style={secondaryButtonStyle}>
           <Table2 size={16} />
-          Monatsplanung
+          Schicht-Editor
         </Link>
       </div>
 
       <Card style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 12,
-            flexWrap: 'wrap',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <div style={toolbarStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button onClick={setPrevious} style={iconButtonStyle} title="Zurueck">
+              <ChevronLeft size={18} />
+            </button>
+            <div style={periodStyle}>{title}</div>
+            <button onClick={setNext} style={iconButtonStyle} title="Weiter">
+              <ChevronRight size={18} />
+            </button>
+            <div style={segmentedStyle}>
               <button
-                onClick={() => setYear((current) => current - 1)}
-                title="Vorjahr"
-                style={iconButtonStyle}
+                onClick={() => setMode('year')}
+                style={segmentStyle(mode === 'year')}
               >
-                <ChevronLeft size={18} />
-              </button>
-              <div style={{
-                minWidth: 120,
-                textAlign: 'center',
-                fontWeight: 700,
-                fontSize: 20,
-                color: '#0f172a',
-              }}>
-                {year}
-              </div>
-              <button
-                onClick={() => setYear((current) => current + 1)}
-                title="Naechstes Jahr"
-                style={iconButtonStyle}
-              >
-                <ChevronRight size={18} />
+                Jahr
               </button>
               <button
-                onClick={() => setYear(2026)}
-                title="Auf 2026 springen"
-                style={secondaryButtonStyle}
+                onClick={() => setMode('month')}
+                style={segmentStyle(mode === 'month')}
               >
-                2026
+                Monat
               </button>
             </div>
+            {mode === 'month' && (
+              <select value={month} onChange={(event) => setMonth(Number(event.target.value))} style={selectStyle}>
+                {MONTH_NAMES.map((name, index) => (
+                  <option key={name} value={index + 1}>{name}</option>
+                ))}
+              </select>
+            )}
+            {isHR && (
+              <select value={departmentId} onChange={(event) => setDepartmentId(event.target.value)} style={selectStyle}>
+                <option value="">Alle Abteilungen</option>
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>{department.name}</option>
+                ))}
+              </select>
+            )}
+          </div>
+          <button onClick={() => void load()} style={secondaryButtonStyle}>
+            <RefreshCw size={16} />
+            Aktualisieren
+          </button>
+        </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <div style={{
-                position: 'relative',
-                width: 240,
-                maxWidth: '100%',
-              }}>
-                <Search
-                  size={16}
-                  style={{
-                    position: 'absolute',
-                    left: 10,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: '#64748b',
-                  }}
+        <div style={metricGridStyle}>
+          <Metric label="Mitarbeiter" value={employees.length} />
+          <Metric label="Eintraege" value={totalEvents} />
+          <Metric label="Dienstreisen" value={totalTravel} />
+          <Metric label="Offene Reisen" value={pendingTravel.length} />
+        </div>
+      </Card>
+
+      {error && <div style={errorStyle}>{error}</div>}
+
+      <div style={contentGridStyle}>
+        <div style={{ minWidth: 0 }}>
+          <Card style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={calendarHeaderStyle}>
+              <div style={{ fontWeight: 700, color: '#1e293b' }}>
+                {mode === 'year' ? 'Jahresansicht' : 'Monatsansicht'}
+              </div>
+              <Legend />
+            </div>
+            <PlanningTable
+              mode={mode}
+              days={days}
+              employees={employees}
+              monthHeaders={monthHeaders}
+              loading={loading}
+              onOpenMonth={openMonth}
+            />
+          </Card>
+        </div>
+
+        <aside style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 280 }}>
+          <Card title="Dienstreise">
+            <form onSubmit={submitTravel} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <select
+                value={travelForm.employee_id}
+                onChange={(event) => setTravelForm((current) => ({ ...current, employee_id: event.target.value }))}
+                style={inputStyle}
+              >
+                <option value="">Eigene Dienstreise</option>
+                {employees.map((employee) => (
+                  <option key={employee.id} value={employee.id}>{employee.name}</option>
+                ))}
+              </select>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <input
+                  type="date"
+                  value={travelForm.start_date}
+                  onChange={(event) => setTravelForm((current) => ({ ...current, start_date: event.target.value }))}
+                  style={inputStyle}
+                  required
                 />
                 <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Mitarbeiter suchen"
-                  style={{
-                    width: '100%',
-                    height: 36,
-                    padding: '0 10px 0 34px',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: 8,
-                    fontSize: 13,
-                    outline: 'none',
-                  }}
+                  type="date"
+                  value={travelForm.end_date}
+                  onChange={(event) => setTravelForm((current) => ({ ...current, end_date: event.target.value }))}
+                  style={inputStyle}
+                  required
                 />
               </div>
-              <button onClick={exportCsv} title="CSV exportieren" style={secondaryButtonStyle}>
-                <Download size={16} />
-                CSV
+              <input
+                value={travelForm.destination}
+                onChange={(event) => setTravelForm((current) => ({ ...current, destination: event.target.value }))}
+                placeholder="Ziel"
+                style={inputStyle}
+                required
+              />
+              <input
+                value={travelForm.purpose}
+                onChange={(event) => setTravelForm((current) => ({ ...current, purpose: event.target.value }))}
+                placeholder="Anlass"
+                style={inputStyle}
+                required
+              />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <input
+                  value={travelForm.cost_center}
+                  onChange={(event) => setTravelForm((current) => ({ ...current, cost_center: event.target.value }))}
+                  placeholder="Kostenstelle"
+                  style={inputStyle}
+                />
+                <input
+                  type="number"
+                  value={travelForm.estimated_costs}
+                  onChange={(event) => setTravelForm((current) => ({ ...current, estimated_costs: event.target.value }))}
+                  placeholder="Kosten"
+                  style={inputStyle}
+                />
+              </div>
+              <input
+                value={travelForm.transport_type}
+                onChange={(event) => setTravelForm((current) => ({ ...current, transport_type: event.target.value }))}
+                placeholder="Verkehrsmittel"
+                style={inputStyle}
+              />
+              <button type="submit" style={primaryButtonStyle}>
+                <Plane size={16} />
+                Beantragen
               </button>
-            </div>
-          </div>
+            </form>
+          </Card>
 
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            {DUTY_CODE_OPTIONS.map((option) => (
-              <button
-                key={option.code}
-                onClick={() => setActiveTool(option.code)}
-                title={option.label}
-                style={{
-                  ...codeButtonStyle,
-                  borderColor: activeTool === option.code ? '#0f172a' : '#cbd5e1',
-                  boxShadow: activeTool === option.code ? '0 0 0 2px rgba(15,23,42,0.12)' : 'none',
-                }}
-              >
-                <span style={{
-                  width: 16,
-                  height: 16,
-                  borderRadius: 4,
-                  background: option.background,
-                  border: '1px solid rgba(15,23,42,0.18)',
-                }} />
-                <span>{option.code}</span>
-              </button>
-            ))}
-            <button
-              onClick={() => setActiveTool('erase')}
-              title="Zellen leeren"
+          <Card title={`Offene Dienstreisen (${pendingTravel.length})`}>
+            {pendingTravel.length === 0 ? (
+              <div style={{ color: '#94a3b8', fontSize: 13, padding: '8px 0' }}>
+                Keine offenen Antraege
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {pendingTravel.map((travel) => (
+                  <div key={travel.id} style={pendingTravelStyle}>
+                    <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
+                      {travel.employee_name || `Mitarbeiter ${travel.employee_id}`}
+                    </div>
+                    <div style={{ color: '#64748b', fontSize: 12 }}>
+                      {travel.start_date} bis {travel.end_date}
+                    </div>
+                    <div style={{ color: '#334155', fontSize: 12, marginTop: 2 }}>
+                      {travel.destination}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                      <button onClick={() => void reviewTravel(travel.id, true)} style={approveButtonStyle}>
+                        <Check size={14} />
+                      </button>
+                      <button onClick={() => void reviewTravel(travel.id, false)} style={rejectButtonStyle}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function PlanningTable({
+  mode,
+  days,
+  employees,
+  monthHeaders,
+  loading,
+  onOpenMonth,
+}: {
+  mode: ViewMode;
+  days: string[];
+  employees: PlanningEmployee[];
+  monthHeaders: Array<{ month: number; label: string; count: number }>;
+  loading: boolean;
+  onOpenMonth: (day: string) => void;
+}) {
+  const tableWidth = NAME_WIDTH + days.length * DAY_WIDTH;
+
+  return (
+    <div style={{ overflow: 'auto', maxHeight: mode === 'year' ? 'calc(100vh - 310px)' : 'calc(100vh - 280px)', minHeight: 360 }}>
+      <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: tableWidth, width: tableWidth }}>
+        <thead>
+          {mode === 'year' && (
+            <tr>
+              <th style={stickyHeaderStyle(0, 0, NAME_WIDTH)} rowSpan={2}>Name</th>
+              {monthHeaders.map((header) => (
+                <th
+                  key={`${header.month}-${header.label}`}
+                  colSpan={header.count}
+                  style={{
+                    ...headerCellStyle,
+                    top: 0,
+                    height: 28,
+                    background: '#eef7e9',
+                    borderLeft: '2px solid #94a3b8',
+                  }}
+                >
+                  {header.label}
+                </th>
+              ))}
+            </tr>
+          )}
+          <tr>
+            {mode === 'month' && <th style={stickyHeaderStyle(0, 0, NAME_WIDTH)}>Name</th>}
+            {days.map((day) => {
+              const parsed = localDate(day);
+              return (
+                <th
+                  key={day}
+                  onClick={() => mode === 'year' && onOpenMonth(day)}
+                  title={`${WEEKDAY_SHORT[parsed.getDay()]} ${parsed.getDate()}.${parsed.getMonth() + 1}.${parsed.getFullYear()}`}
+                  style={{
+                    ...headerCellStyle,
+                    top: mode === 'year' ? 28 : 0,
+                    width: DAY_WIDTH,
+                    minWidth: DAY_WIDTH,
+                    cursor: mode === 'year' ? 'pointer' : 'default',
+                    background: isWeekend(day) ? '#e0f2fe' : '#ffffff',
+                    borderLeft: parsed.getDate() === 1 ? '2px solid #94a3b8' : '1px solid #cbd5e1',
+                  }}
+                >
+                  <div style={{ fontSize: 10, color: isWeekend(day) ? '#0369a1' : '#64748b' }}>
+                    {mode === 'month' ? WEEKDAY_SHORT[parsed.getDay()] : ''}
+                  </div>
+                  <div>{parsed.getDate()}</div>
+                </th>
+              );
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          {loading && (
+            <tr>
+              <td colSpan={days.length + 1} style={{ padding: 28, textAlign: 'center', color: '#64748b' }}>
+                Planung wird geladen...
+              </td>
+            </tr>
+          )}
+          {!loading && employees.map((employee, rowIndex) => (
+            <tr key={employee.id}>
+              <td style={stickyBodyStyle(rowIndex)}>
+                <div style={{ fontWeight: 700, color: '#0f172a' }}>{employee.name}</div>
+                <div style={{ color: '#94a3b8', fontSize: 10 }}>{employee.department_name || 'Ohne Abteilung'}</div>
+              </td>
+              {employee.days.map((day) => (
+                <CalendarCell key={`${employee.id}-${day.date}`} day={day} compact={mode === 'year'} />
+              ))}
+            </tr>
+          ))}
+          {!loading && employees.length === 0 && (
+            <tr>
+              <td colSpan={days.length + 1} style={{ padding: 28, textAlign: 'center', color: '#64748b' }}>
+                Keine Mitarbeiter gefunden.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function CalendarCell({ day, compact }: { day: PlanningDay; compact: boolean }) {
+  const primary = day.events[0];
+  const hasConflict = day.events.some((event) => event.type === 'absence') &&
+    day.events.some((event) => event.type === 'shift' || event.type === 'duty');
+
+  return (
+    <td
+      title={day.events.map(eventTitle).join('\n')}
+      style={{
+        width: DAY_WIDTH,
+        minWidth: DAY_WIDTH,
+        height: compact ? 24 : 52,
+        border: hasConflict ? '2px solid #dc2626' : '1px solid #cbd5e1',
+        background: primary?.color ? `${primary.color}24` : isWeekend(day.date) ? '#f0f9ff' : '#ffffff',
+        color: '#0f172a',
+        textAlign: 'center',
+        verticalAlign: 'top',
+        padding: compact ? 1 : 3,
+      }}
+    >
+      {compact ? (
+        <div style={{ fontSize: 10, fontWeight: 800, color: primary?.color || '#cbd5e1', lineHeight: '20px' }}>
+          {primary?.code || ''}
+          {day.events.length > 1 ? '+' : ''}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {day.events.slice(0, 3).map((event, index) => (
+            <span
+              key={`${event.type}-${event.id}-${index}`}
               style={{
-                ...codeButtonStyle,
-                borderColor: activeTool === 'erase' ? '#0f172a' : '#cbd5e1',
-                boxShadow: activeTool === 'erase' ? '0 0 0 2px rgba(15,23,42,0.12)' : 'none',
+                background: event.color,
+                color: event.color === '#FACC15' || event.color === '#EAB308' ? '#111827' : '#ffffff',
+                borderRadius: 4,
+                padding: '2px 3px',
+                fontSize: 10,
+                fontWeight: 800,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
               }}
             >
-              <Eraser size={16} />
-              Leeren
-            </button>
-          </div>
-
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-            gap: 10,
-          }}>
-            <Metric label="Mitarbeiter" value={filteredEmployees.length} />
-            <Metric label="Urlaub geplant" value={totalVacation} />
-            <Metric label="Bereitschaften" value={totalReadiness} />
-            <Metric
-              label="Status"
-              value={saveStateLabel(saveState, stagedCount)}
-              icon={saveState === 'saving' ? <Save size={16} /> : <Paintbrush size={16} />}
-            />
-          </div>
-        </div>
-      </Card>
-
-      {error && (
-        <div style={{
-          marginBottom: 12,
-          padding: '10px 12px',
-          borderRadius: 8,
-          background: '#fee2e2',
-          color: '#991b1b',
-          fontSize: 13,
-        }}>
-          {error}
+              {event.code}
+            </span>
+          ))}
+          {day.events.length > 3 && <span style={{ color: '#64748b', fontSize: 10 }}>+{day.events.length - 3}</span>}
         </div>
       )}
-
-      <Card style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          padding: '12px 14px',
-          borderBottom: '1px solid #e2e8f0',
-          background: '#ffffff',
-          flexWrap: 'wrap',
-        }}>
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            fontSize: 13,
-            color: '#334155',
-            fontWeight: 600,
-          }}>
-            <Paintbrush size={16} />
-            {activeTool === 'erase' ? 'Leeren' : `${activeOption?.code} - ${activeOption?.label}`}
-          </div>
-          <div style={{ color: '#64748b', fontSize: 12 }}>
-            Ziehen zum Malen, Rechtsklick leert eine Zelle.
-          </div>
-        </div>
-
-        <div style={{
-          overflow: 'auto',
-          maxHeight: 'calc(100vh - 330px)',
-          minHeight: 360,
-          background: '#f8fafc',
-        }}>
-          <table style={{
-            borderCollapse: 'collapse',
-            tableLayout: 'fixed',
-            minWidth: tableMinWidth,
-            width: tableMinWidth,
-            userSelect: 'none',
-            background: '#ffffff',
-          }}>
-            <thead>
-              <tr>
-                <th rowSpan={3} style={stickyHeaderStyle(0, NAME_WIDTH)}>Name</th>
-                <th rowSpan={3} style={stickyHeaderStyle(NAME_WIDTH, BALANCE_WIDTH)}>Rest 2025</th>
-                <th rowSpan={3} style={stickyHeaderStyle(NAME_WIDTH + BALANCE_WIDTH, BALANCE_WIDTH)}>
-                  {year}
-                </th>
-                {monthHeaders.map((month) => (
-                  <th
-                    key={month.name}
-                    colSpan={month.days}
-                    style={{
-                      ...tableHeaderCell,
-                      position: 'sticky',
-                      top: 0,
-                      zIndex: 2,
-                      height: 28,
-                      background: '#eef7e9',
-                      borderLeft: month.month === 0 ? '2px solid #94a3b8' : '1px solid #cbd5e1',
-                    }}
-                  >
-                    {month.name}
-                  </th>
-                ))}
-              </tr>
-              <tr>
-                {days.map((day) => (
-                  <th
-                    key={`kw-${day.key}`}
-                    style={{
-                      ...tableHeaderCell,
-                      position: 'sticky',
-                      top: 28,
-                      zIndex: 2,
-                      width: DAY_WIDTH,
-                      background: isWeekend(day) ? '#d9f4fb' : '#f8fafc',
-                      borderLeft: day.day === 1 ? '2px solid #94a3b8' : '1px solid #cbd5e1',
-                    }}
-                  >
-                    {day.weekday === 1 || day.day === 1 ? day.week : ''}
-                  </th>
-                ))}
-              </tr>
-              <tr>
-                {days.map((day) => (
-                  <th
-                    key={`day-${day.key}`}
-                    title={`${WEEKDAY_SHORT[day.weekday]} ${day.day}.${day.month + 1}.${year}`}
-                    style={{
-                      ...tableHeaderCell,
-                      position: 'sticky',
-                      top: 52,
-                      zIndex: 2,
-                      width: DAY_WIDTH,
-                      background: isWeekend(day) ? '#d9f4fb' : isHolidayBand(day) ? '#ffefb0' : '#ffffff',
-                      borderLeft: day.day === 1 ? '2px solid #94a3b8' : '1px solid #cbd5e1',
-                    }}
-                  >
-                    {day.day}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan={days.length + 3} style={{ padding: 28, textAlign: 'center', color: '#64748b' }}>
-                    Dienstplanung wird geladen...
-                  </td>
-                </tr>
-              )}
-
-              {!loading && filteredEmployees.map((employee, rowIndex) => (
-                <tr key={employee.id}>
-                  <td style={{
-                    ...stickyBodyStyle(0, NAME_WIDTH, rowIndex),
-                    padding: '0 8px',
-                    textAlign: 'left',
-                    fontWeight: 600,
-                    color: '#0f172a',
-                  }}>
-                    {getEmployeeName(employee)}
-                  </td>
-                  <td style={stickyBodyStyle(NAME_WIDTH, BALANCE_WIDTH, rowIndex)}>
-                    0
-                  </td>
-                  <td style={stickyBodyStyle(NAME_WIDTH + BALANCE_WIDTH, BALANCE_WIDTH, rowIndex)}>
-                    {remainingVacationDays(employee)}
-                  </td>
-                  {days.map((day) => {
-                    const code = assignments[employee.id]?.[day.key] || null;
-                    const option = code ? DUTY_CODE_MAP[code] : null;
-                    return (
-                      <td
-                        key={`${employee.id}-${day.key}`}
-                        title={`${getEmployeeName(employee)} - ${WEEKDAY_SHORT[day.weekday]} ${day.day}.${day.month + 1}.${year}${option ? ` - ${option.label}` : ''}`}
-                        onMouseDown={(event) => handleCellMouseDown(employee.id, day.key, event)}
-                        onMouseEnter={() => handleCellMouseEnter(employee.id, day.key)}
-                        onContextMenu={(event) => handleCellContextMenu(employee.id, day.key, event)}
-                        style={{
-                          width: DAY_WIDTH,
-                          height: 22,
-                          border: '1px solid #cbd5e1',
-                          borderLeft: day.day === 1 ? '2px solid #94a3b8' : '1px solid #cbd5e1',
-                          background: option?.background || (isWeekend(day) ? '#d9f4fb' : isHolidayBand(day) ? '#ffefb0' : '#ffffff'),
-                          color: option?.color || '#0f172a',
-                          textAlign: 'center',
-                          fontSize: 10,
-                          fontWeight: option ? 700 : 500,
-                          cursor: activeTool === 'erase' ? 'cell' : 'crosshair',
-                          lineHeight: '22px',
-                        }}
-                      >
-                        {option?.cellText || ''}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-
-              {!loading && filteredEmployees.length === 0 && (
-                <tr>
-                  <td colSpan={days.length + 3} style={{ padding: 28, textAlign: 'center', color: '#64748b' }}>
-                    Keine Mitarbeiter gefunden.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-    </div>
+    </td>
   );
 }
 
-function Metric({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: string | number;
-  icon?: ReactNode;
-}) {
+function Metric({ label, value }: { label: string; value: string | number }) {
   return (
-    <div style={{
-      border: '1px solid #e2e8f0',
-      borderRadius: 8,
-      padding: '10px 12px',
-      minHeight: 58,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 10,
-      background: '#f8fafc',
-    }}>
-      <div>
-        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>{label}</div>
-        <div style={{ fontSize: 17, color: '#0f172a', fontWeight: 700 }}>{value}</div>
-      </div>
-      {icon && <div style={{ color: '#475569', display: 'flex' }}>{icon}</div>}
+    <div style={metricStyle}>
+      <div style={{ color: '#64748b', fontSize: 12 }}>{label}</div>
+      <div style={{ color: '#0f172a', fontSize: 18, fontWeight: 800 }}>{value}</div>
     </div>
   );
 }
 
-function saveStateLabel(saveState: SaveState, stagedCount: number) {
-  if (stagedCount > 0) return `${stagedCount} offen`;
-  if (saveState === 'saving') return 'Speichert';
-  if (saveState === 'saved') return 'Gespeichert';
-  if (saveState === 'error') return 'Fehler';
-  return 'Bereit';
+function Legend() {
+  const items = [
+    ['Dienst', '#3B82F6'],
+    ['Abwesenheit', '#FACC15'],
+    ['Dienstreise', '#65A30D'],
+    ['Hinweis', '#64748B'],
+    ['Konflikt', '#DC2626'],
+  ] as const;
+
+  return (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+      {items.map(([label, color]) => (
+        <Badge key={label} text={label} color={color} />
+      ))}
+    </div>
+  );
 }
 
-function stickyHeaderStyle(left: number, width: number): CSSProperties {
+function segmentStyle(active: boolean): CSSProperties {
   return {
-    ...stickyColumnBase,
-    top: 0,
-    left,
-    width,
-    minWidth: width,
-    zIndex: 5,
-    height: 80,
-    fontSize: 11,
+    border: 'none',
+    background: active ? '#1e293b' : 'transparent',
+    color: active ? '#ffffff' : '#475569',
+    padding: '7px 12px',
+    borderRadius: 6,
+    fontSize: 13,
     fontWeight: 700,
-    color: '#0f172a',
+    cursor: 'pointer',
   };
 }
 
-function stickyBodyStyle(left: number, width: number, rowIndex: number): CSSProperties {
+function stickyHeaderStyle(top: number, left: number, width: number): CSSProperties {
   return {
-    ...stickyColumnBase,
+    ...headerCellStyle,
+    position: 'sticky',
+    top,
     left,
+    zIndex: 5,
     width,
     minWidth: width,
-    height: 22,
-    textAlign: 'center',
-    fontSize: 11,
-    background: rowIndex % 2 === 0 ? '#eef4e8' : '#ffffff',
+    background: '#ffffff',
   };
 }
+
+function stickyBodyStyle(rowIndex: number): CSSProperties {
+  return {
+    position: 'sticky',
+    left: 0,
+    zIndex: 4,
+    width: NAME_WIDTH,
+    minWidth: NAME_WIDTH,
+    height: 36,
+    border: '1px solid #cbd5e1',
+    background: rowIndex % 2 === 0 ? '#f8fafc' : '#ffffff',
+    padding: '4px 8px',
+    textAlign: 'left',
+  };
+}
+
+const topbarStyle: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  gap: 16,
+  marginBottom: 18,
+  flexWrap: 'wrap',
+};
+
+const headingStyle: CSSProperties = {
+  margin: 0,
+  fontSize: 24,
+  color: '#1e293b',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+};
+
+const toolbarStyle: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: 12,
+  flexWrap: 'wrap',
+};
+
+const periodStyle: CSSProperties = {
+  minWidth: 150,
+  textAlign: 'center',
+  fontWeight: 800,
+  color: '#0f172a',
+  fontSize: 18,
+};
+
+const segmentedStyle: CSSProperties = {
+  display: 'inline-flex',
+  padding: 3,
+  border: '1px solid #cbd5e1',
+  borderRadius: 8,
+  background: '#f8fafc',
+};
+
+const metricGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+  gap: 10,
+  marginTop: 14,
+};
+
+const metricStyle: CSSProperties = {
+  border: '1px solid #e2e8f0',
+  background: '#f8fafc',
+  borderRadius: 8,
+  padding: '10px 12px',
+};
+
+const contentGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) 320px',
+  gap: 16,
+  alignItems: 'start',
+};
+
+const calendarHeaderStyle: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  gap: 12,
+  alignItems: 'center',
+  padding: '12px 14px',
+  borderBottom: '1px solid #e2e8f0',
+  flexWrap: 'wrap',
+};
+
+const headerCellStyle: CSSProperties = {
+  position: 'sticky',
+  zIndex: 3,
+  border: '1px solid #cbd5e1',
+  padding: 0,
+  height: 32,
+  fontSize: 11,
+  fontWeight: 800,
+  color: '#0f172a',
+  textAlign: 'center',
+  whiteSpace: 'nowrap',
+};
 
 const iconButtonStyle: CSSProperties = {
   height: 36,
@@ -828,21 +827,74 @@ const secondaryButtonStyle: CSSProperties = {
   padding: '0 12px',
   cursor: 'pointer',
   fontSize: 13,
-  fontWeight: 600,
+  fontWeight: 700,
+  textDecoration: 'none',
 };
 
-const codeButtonStyle: CSSProperties = {
-  height: 34,
-  border: '1px solid #cbd5e1',
+const primaryButtonStyle: CSSProperties = {
+  minHeight: 36,
+  border: 'none',
   borderRadius: 8,
-  background: '#ffffff',
-  color: '#1e293b',
+  background: '#2563eb',
+  color: '#ffffff',
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  gap: 6,
-  padding: '0 10px',
+  gap: 8,
+  padding: '0 12px',
   cursor: 'pointer',
-  fontSize: 12,
+  fontSize: 13,
   fontWeight: 700,
+};
+
+const selectStyle: CSSProperties = {
+  height: 36,
+  border: '1px solid #cbd5e1',
+  borderRadius: 8,
+  background: '#ffffff',
+  color: '#334155',
+  padding: '0 10px',
+  fontSize: 13,
+};
+
+const inputStyle: CSSProperties = {
+  minHeight: 36,
+  border: '1px solid #cbd5e1',
+  borderRadius: 8,
+  padding: '0 10px',
+  fontSize: 13,
+  boxSizing: 'border-box',
+  width: '100%',
+};
+
+const errorStyle: CSSProperties = {
+  marginBottom: 12,
+  padding: '10px 12px',
+  borderRadius: 8,
+  background: '#fee2e2',
+  color: '#991b1b',
+  fontSize: 13,
+};
+
+const pendingTravelStyle: CSSProperties = {
+  border: '1px solid #e2e8f0',
+  borderRadius: 8,
+  padding: 10,
+  background: '#f8fafc',
+};
+
+const approveButtonStyle: CSSProperties = {
+  ...secondaryButtonStyle,
+  minHeight: 30,
+  width: 34,
+  padding: 0,
+  color: '#16a34a',
+};
+
+const rejectButtonStyle: CSSProperties = {
+  ...secondaryButtonStyle,
+  minHeight: 30,
+  width: 34,
+  padding: 0,
+  color: '#dc2626',
 };
