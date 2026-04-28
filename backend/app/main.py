@@ -113,7 +113,7 @@ async def app_version():
     """Aktuelle App-Version fuer Auto-Update-Check."""
     return {
         "version": "1.5.2",
-        "download_url": "https://mva.c3po42.de/download/app-release.apk",
+        "download_url": "https://downloads.c3po42.de/mva/app-release.apk",
         "force_update": False,
     }
 
