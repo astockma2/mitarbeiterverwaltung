@@ -57,7 +57,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     description="Mitarbeiterverwaltung mit Zeiterfassung und Kommunikation",
-    version="1.5.1",
+    version="1.5.2",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     lifespan=lifespan,
@@ -105,14 +105,14 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "ok", "version": "1.5.1"}
+    return {"status": "ok", "version": "1.5.2"}
 
 
 @app.get("/api/v1/app/version")
 async def app_version():
     """Aktuelle App-Version fuer Auto-Update-Check."""
     return {
-        "version": "1.5.1",
+        "version": "1.5.2",
         "download_url": "https://mva.c3po42.de/download/app-release.apk",
         "force_update": False,
     }

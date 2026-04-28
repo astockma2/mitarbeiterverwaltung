@@ -99,7 +99,8 @@ class _ShiftPlanScreenState extends State<ShiftPlanScreen> {
                   Center(
                     child: Text(
                       '${_shifts.length} Schichten',
-                      style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                      style:
+                          TextStyle(color: Colors.grey.shade600, fontSize: 13),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -189,7 +190,8 @@ class _ShiftPlanScreenState extends State<ShiftPlanScreen> {
                     }
 
                     final dateStr = DateFormat('yyyy-MM-dd').format(
-                      DateTime(_currentMonth.year, _currentMonth.month, dayIndex),
+                      DateTime(
+                          _currentMonth.year, _currentMonth.month, dayIndex),
                     );
                     final shift = shiftMap[dateStr];
                     final isToday = dateStr == today;
@@ -204,9 +206,7 @@ class _ShiftPlanScreenState extends State<ShiftPlanScreen> {
                               ? Border.all(color: Colors.blue, width: 2)
                               : Border.all(color: Colors.grey.shade200),
                           borderRadius: BorderRadius.circular(6),
-                          color: isWeekend
-                              ? Colors.grey.shade50
-                              : Colors.white,
+                          color: isWeekend ? Colors.grey.shade50 : Colors.white,
                         ),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -233,9 +233,8 @@ class _ShiftPlanScreenState extends State<ShiftPlanScreen> {
                                   style: TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.w700,
-                                    color:
-                                        _shiftTextColors[shift.shiftCode] ??
-                                            Colors.grey.shade700,
+                                    color: _shiftTextColors[shift.shiftCode] ??
+                                        Colors.grey.shade700,
                                   ),
                                 ),
                               ),
@@ -248,7 +247,8 @@ class _ShiftPlanScreenState extends State<ShiftPlanScreen> {
                                   runSpacing: 1,
                                   children: shift.extras
                                       .take(2)
-                                      .map((extra) => _buildExtraChip(extra, compact: true))
+                                      .map((extra) =>
+                                          _buildExtraChip(extra, compact: true))
                                       .toList(),
                                 ),
                               ),
