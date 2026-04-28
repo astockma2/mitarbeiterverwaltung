@@ -255,6 +255,7 @@ async def seed_jahresplan_2026() -> None:
             ).limit(1)
         )
         if existing_count.scalar_one_or_none() is not None:
+            await db.commit()
             logger.info("Jahresplan-Seed: 2026-Eintraege vorhanden, ueberspringe.")
             return
 
