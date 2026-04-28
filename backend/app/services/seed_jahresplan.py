@@ -2,7 +2,7 @@
 
 Legt 9 IT-Mitarbeiter an (falls fehlend) und uebertraegt die Codes aus dem
 Plan-Screenshot vom 26.04.2026 als DutyPlanEntry-Eintraege.
-Codes: U=Urlaub, Ug=Urlaub geplant, A=Arbeitszeitausgleich, S=Schulung,
+Codes: U=Urlaub, Ug=Urlaub geplant, A=Arbeitszeitausgleich, S=Schule Azubi,
 B=Bereitschaft, I=Ilmenau, H=Hotlinedienst, M=MVZ, Dr=Dienstreise, K=Kur,
 su=security update day, T=Teammeeting, Ez=Elternzeit, TSC=Zeitreduzierung TSC.
 Leere Felder = Normaldienst.
@@ -231,6 +231,20 @@ async def seed_jahresplan_2026() -> None:
                 db.add(emp)
                 await db.flush()
                 logger.info("Jahresplan-Seed: Mitarbeiter angelegt %s %s", vorname, nachname)
+            else:
+                emp.personnel_number = personnel_number
+                emp.ad_username = ad_user
+                emp.first_name = vorname
+                emp.last_name = nachname
+                emp.email = emp.email or f"{ad_user}@klinik.local"
+                emp.department_id = it_dept.id
+                emp.role = emp.role or UserRole.EMPLOYEE
+                emp.job_title = emp.job_title or "IT-Systemadministrator"
+                emp.employment_type = emp.employment_type or EmploymentType.FULLTIME
+                emp.weekly_hours = emp.weekly_hours or 38.5
+                emp.hire_date = emp.hire_date or date(2018, 1, 1)
+                emp.vacation_days_per_year = 30
+                emp.is_active = True
             emp_by_pn[personnel_number] = emp
 
         # Pruefen ob bereits Eintraege fuer 2026 existieren - dann ueberspringen

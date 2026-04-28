@@ -1,3 +1,29 @@
+class ScheduleExtra {
+  final String type;
+  final String code;
+  final String label;
+  final String status;
+  final String color;
+
+  ScheduleExtra({
+    required this.type,
+    required this.code,
+    required this.label,
+    required this.status,
+    required this.color,
+  });
+
+  factory ScheduleExtra.fromJson(Map<String, dynamic> json) {
+    return ScheduleExtra(
+      type: json['type'] ?? '',
+      code: json['code'] ?? '',
+      label: json['label'] ?? '',
+      status: json['status'] ?? '',
+      color: json['color'] ?? '#64748B',
+    );
+  }
+}
+
 class ShiftAssignment {
   final int id;
   final String date;
@@ -6,6 +32,7 @@ class ShiftAssignment {
   final String shiftStart;
   final String shiftEnd;
   final String status;
+  final List<ScheduleExtra> extras;
 
   ShiftAssignment({
     required this.id,
@@ -15,6 +42,7 @@ class ShiftAssignment {
     required this.shiftStart,
     required this.shiftEnd,
     required this.status,
+    required this.extras,
   });
 
   factory ShiftAssignment.fromJson(Map<String, dynamic> json) {
@@ -26,6 +54,9 @@ class ShiftAssignment {
       shiftStart: json['shift_start'] ?? '',
       shiftEnd: json['shift_end'] ?? '',
       status: json['status'] ?? '',
+      extras: ((json['extras'] ?? []) as List)
+          .map((e) => ScheduleExtra.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
   }
 }

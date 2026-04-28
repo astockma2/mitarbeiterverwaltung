@@ -19,11 +19,13 @@ class _ShiftPlanScreenState extends State<ShiftPlanScreen> {
 
   // Schichtfarben
   static const _shiftColors = {
+    'D': Color(0xFFDBEAFE), // Normaldienst - Blau
     'F': Color(0xFFDCFCE7), // Frueh - Gruen
     'S': Color(0xFFFEF3C7), // Spaet - Gelb
     'N': Color(0xFFE0E7FF), // Nacht - Lila
   };
   static const _shiftTextColors = {
+    'D': Color(0xFF1E40AF),
     'F': Color(0xFF166534),
     'S': Color(0xFF92400E),
     'N': Color(0xFF3730A3),
@@ -183,7 +185,7 @@ class _ShiftPlanScreenState extends State<ShiftPlanScreen> {
                   children: List.generate(7, (col) {
                     final dayIndex = week * 7 + col - firstWeekday + 1;
                     if (dayIndex < 1 || dayIndex > daysInMonth) {
-                      return Expanded(child: SizedBox(height: 56));
+                      return Expanded(child: SizedBox(height: 72));
                     }
 
                     final dateStr = DateFormat('yyyy-MM-dd').format(
@@ -195,7 +197,7 @@ class _ShiftPlanScreenState extends State<ShiftPlanScreen> {
 
                     return Expanded(
                       child: Container(
-                        height: 56,
+                        height: 72,
                         margin: const EdgeInsets.all(1),
                         decoration: BoxDecoration(
                           border: isToday
@@ -235,6 +237,19 @@ class _ShiftPlanScreenState extends State<ShiftPlanScreen> {
                                         _shiftTextColors[shift.shiftCode] ??
                                             Colors.grey.shade700,
                                   ),
+                                ),
+                              ),
+                            if (shift != null && shift.extras.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Wrap(
+                                  alignment: WrapAlignment.center,
+                                  spacing: 2,
+                                  runSpacing: 1,
+                                  children: shift.extras
+                                      .take(2)
+                                      .map((extra) => _buildExtraChip(extra, compact: true))
+                                      .toList(),
                                 ),
                               ),
                           ],
@@ -278,12 +293,71 @@ class _ShiftPlanScreenState extends State<ShiftPlanScreen> {
           s.shiftName,
           style: const TextStyle(fontWeight: FontWeight.w500),
         ),
-        subtitle: Text('${s.shiftStart} - ${s.shiftEnd}'),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(_formatShiftTime(s)),
+            if (s.extras.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: s.extras.map(_buildExtraChip).toList(),
+                ),
+              ),
+          ],
+        ),
         trailing: Text(
           s.date,
           style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
         ),
       ),
     );
+  }
+
+  Widget _buildExtraChip(ScheduleExtra extra, {bool compact = false}) {
+    final color = _parseHexColor(extra.color);
+    return Tooltip(
+      message: '${extra.label} (${extra.status})',
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 3 : 6,
+          vertical: compact ? 1 : 2,
+        ),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          extra.code,
+          style: TextStyle(
+            color: _readableTextColor(color),
+            fontSize: compact ? 9 : 11,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _parseHexColor(String value) {
+    final normalized = value.replaceAll('#', '').trim();
+    if (normalized.length != 6) return Colors.grey.shade600;
+    final parsed = int.tryParse('FF$normalized', radix: 16);
+    if (parsed == null) return Colors.grey.shade600;
+    return Color(parsed);
+  }
+
+  Color _readableTextColor(Color color) {
+    final luminance = color.computeLuminance();
+    return luminance > 0.55 ? Colors.grey.shade900 : Colors.white;
+  }
+
+  String _formatShiftTime(ShiftAssignment shift) {
+    if (shift.shiftStart.isEmpty && shift.shiftEnd.isEmpty) {
+      return 'Zusatzdienst';
+    }
+    return '${shift.shiftStart} - ${shift.shiftEnd}';
   }
 }

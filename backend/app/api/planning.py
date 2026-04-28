@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -92,6 +92,8 @@ class TravelReviewRequest(BaseModel):
 class PlanningImportRequest(BaseModel):
     source: str
     entries: list[dict[str, Any]]
+    employees: list[dict[str, Any] | str] = Field(default_factory=list)
+    years: list[int] = Field(default_factory=list)
 
 
 ACTIVE_TRAVEL_STATUSES = (
@@ -531,9 +533,9 @@ def _event_order(event_type: str) -> int:
     order = {
         "absence": 0,
         "travel": 1,
-        "shift": 2,
-        "duty": 3,
-        "info": 4,
+        "duty": 2,
+        "info": 3,
+        "shift": 4,
     }
     return order.get(event_type, 9)
 

@@ -1,11 +1,12 @@
 """API-Endpoints fuer Schichtplanung: Vorlagen, Dienstplaene, Zuweisung, Tausch."""
 
+from collections import defaultdict
 from calendar import monthrange
 from datetime import date, time, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -13,6 +14,7 @@ from sqlalchemy.orm import selectinload
 from app.auth.jwt import get_current_user
 from app.auth.permissions import is_hr, is_manager
 from app.database import get_db
+from app.models.planning import PlanningMarker, TravelRequest, TravelStatus
 from app.models.employee import Employee
 from app.models.shift import (
     CoverageRequest,
@@ -27,6 +29,7 @@ from app.models.shift import (
     SwapRequest,
     SwapStatus,
 )
+from app.models.time_entry import Absence, AbsenceStatus, AbsenceType
 from app.services.audit import log_action
 from app.services.shift_validator import check_staffing, validate_assignment
 
@@ -80,6 +83,14 @@ class BulkAssignmentCreate(BaseModel):
     dates: list[date]
 
 
+class ScheduleExtra(BaseModel):
+    type: str
+    code: str
+    label: str
+    status: str
+    color: str
+
+
 class AssignmentResponse(BaseModel):
     id: int
     employee_id: int
@@ -92,6 +103,7 @@ class AssignmentResponse(BaseModel):
     date: date
     status: str
     notes: Optional[str] = None
+    extras: list[ScheduleExtra] = Field(default_factory=list)
 
 
 class RequirementCreate(BaseModel):
@@ -129,6 +141,14 @@ DUTY_PLAN_CODES = {
     "Ez",
     "TSC",
 }
+
+
+ACTIVE_TRAVEL_STATUSES = (
+    TravelStatus.REQUESTED,
+    TravelStatus.MANAGER_APPROVED,
+    TravelStatus.APPROVED,
+    TravelStatus.APPROVED_LEGACY,
+)
 
 
 class DutyPlanCellUpsert(BaseModel):
@@ -693,7 +713,10 @@ async def my_schedule(
 
     result = await db.execute(
         select(ShiftAssignment)
-        .options(selectinload(ShiftAssignment.shift_template))
+        .options(
+            selectinload(ShiftAssignment.employee),
+            selectinload(ShiftAssignment.shift_template),
+        )
         .where(
             ShiftAssignment.employee_id == current_user.id,
             ShiftAssignment.date >= start_date,
@@ -703,8 +726,16 @@ async def my_schedule(
         .order_by(ShiftAssignment.date)
     )
     assignments = result.scalars().all()
+    extras_by_date = await _schedule_extras_by_date(db, current_user.id, start_date, end_date)
+    assigned_dates = {assignment.date for assignment in assignments}
 
-    return [_assignment_to_response(a) for a in assignments]
+    responses = [_assignment_to_response(a, extras_by_date.get(a.date, [])) for a in assignments]
+    responses.extend(
+        _virtual_schedule_response(current_user, day, extras)
+        for day, extras in extras_by_date.items()
+        if day not in assigned_dates
+    )
+    return sorted(responses, key=lambda item: (item.date, item.id))
 
 
 # === Besetzungspruefung ===
@@ -1029,7 +1060,138 @@ def _duty_plan_entry_to_response(e: DutyPlanEntry) -> DutyPlanEntryResponse:
     )
 
 
-def _assignment_to_response(a: ShiftAssignment) -> AssignmentResponse:
+async def _schedule_extras_by_date(
+    db: AsyncSession,
+    employee_id: int,
+    start_date: date,
+    end_date: date,
+) -> dict[date, list[ScheduleExtra]]:
+    extras: dict[date, list[ScheduleExtra]] = defaultdict(list)
+
+    absence_result = await db.execute(
+        select(Absence).where(
+            Absence.employee_id == employee_id,
+            Absence.status.in_([AbsenceStatus.REQUESTED, AbsenceStatus.APPROVED]),
+            Absence.start_date <= end_date,
+            Absence.end_date >= start_date,
+        )
+    )
+    for absence in absence_result.scalars().all():
+        for day in _date_range(max(absence.start_date, start_date), min(absence.end_date, end_date)):
+            extras[day].append(
+                ScheduleExtra(
+                    type="absence",
+                    code=_absence_code(absence),
+                    label=_absence_label(absence),
+                    status=absence.status.value,
+                    color=_absence_color(absence),
+                )
+            )
+
+    travel_result = await db.execute(
+        select(TravelRequest).where(
+            TravelRequest.employee_id == employee_id,
+            TravelRequest.status.in_(ACTIVE_TRAVEL_STATUSES),
+            TravelRequest.start_date <= end_date,
+            TravelRequest.end_date >= start_date,
+        )
+    )
+    for travel in travel_result.scalars().all():
+        for day in _date_range(max(travel.start_date, start_date), min(travel.end_date, end_date)):
+            extras[day].append(
+                ScheduleExtra(
+                    type="travel",
+                    code="DR",
+                    label=travel.destination,
+                    status=travel.status.value,
+                    color="#65A30D",
+                )
+            )
+
+    marker_result = await db.execute(
+        select(PlanningMarker).where(
+            PlanningMarker.employee_id == employee_id,
+            PlanningMarker.date >= start_date,
+            PlanningMarker.date <= end_date,
+        )
+    )
+    for marker in marker_result.scalars().all():
+        extras[marker.date].append(
+            ScheduleExtra(
+                type=marker.kind.value.lower(),
+                code=marker.code,
+                label=marker.label,
+                status="IMPORTED",
+                color=marker.color,
+            )
+        )
+
+    return {
+        day: sorted(items, key=lambda item: _schedule_extra_order(item.type))
+        for day, items in extras.items()
+    }
+
+
+def _date_range(start: date, end: date):
+    current = start
+    while current <= end:
+        yield current
+        current += timedelta(days=1)
+
+
+def _absence_code(absence: Absence) -> str:
+    if absence.type == AbsenceType.VACATION:
+        return "Ug" if absence.status == AbsenceStatus.REQUESTED else "U"
+    if absence.type == AbsenceType.COMP_TIME:
+        return "A"
+    if absence.type == AbsenceType.TRAINING:
+        return "S"
+    if absence.type == AbsenceType.SICK:
+        return "K"
+    return absence.type.value[:2]
+
+
+def _absence_label(absence: Absence) -> str:
+    labels = {
+        AbsenceType.VACATION: "Urlaub",
+        AbsenceType.SICK: "Krankheit",
+        AbsenceType.TRAINING: "Schulung",
+        AbsenceType.SPECIAL: "Sonderurlaub",
+        AbsenceType.COMP_TIME: "Arbeitszeitausgleich",
+    }
+    label = labels.get(absence.type, absence.type.value)
+    if absence.status == AbsenceStatus.REQUESTED:
+        return f"{label} beantragt"
+    return label
+
+
+def _absence_color(absence: Absence) -> str:
+    if absence.status == AbsenceStatus.REQUESTED:
+        return "#0EA5E9"
+    colors = {
+        AbsenceType.VACATION: "#FACC15",
+        AbsenceType.SICK: "#EF4444",
+        AbsenceType.TRAINING: "#2563EB",
+        AbsenceType.SPECIAL: "#A855F7",
+        AbsenceType.COMP_TIME: "#FB7185",
+    }
+    return colors.get(absence.type, "#64748B")
+
+
+def _schedule_extra_order(item_type: str) -> int:
+    order = {
+        "absence": 0,
+        "travel": 1,
+        "duty": 2,
+        "info": 3,
+    }
+    return order.get(item_type, 9)
+
+
+def _assignment_to_response(
+    a: ShiftAssignment,
+    extras: list[ScheduleExtra] | None = None,
+) -> AssignmentResponse:
     return AssignmentResponse(
         id=a.id,
         employee_id=a.employee_id,
@@ -1042,4 +1204,27 @@ def _assignment_to_response(a: ShiftAssignment) -> AssignmentResponse:
         date=a.date,
         status=a.status.value,
         notes=a.notes,
+        extras=extras or [],
+    )
+
+
+def _virtual_schedule_response(
+    employee: Employee,
+    day: date,
+    extras: list[ScheduleExtra],
+) -> AssignmentResponse:
+    primary = extras[0]
+    return AssignmentResponse(
+        id=-day.toordinal(),
+        employee_id=employee.id,
+        employee_name=employee.full_name,
+        shift_template_id=0,
+        shift_name=primary.label,
+        shift_code=primary.code,
+        shift_start=None,
+        shift_end=None,
+        date=day,
+        status=primary.status,
+        notes="Planungszusatz ohne Normaldienst",
+        extras=extras,
     )

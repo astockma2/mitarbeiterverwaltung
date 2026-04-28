@@ -11,7 +11,7 @@ import json
 import unicodedata
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +20,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.employee import Employee
 from app.models.planning import PlanningMarker, PlanningMarkerKind, TravelRequest, TravelStatus
-from app.models.shift import DutyPlanEntry
+from app.models.shift import (
+    DutyPlanEntry,
+    PlanStatus,
+    ShiftAssignment,
+    ShiftPlan,
+    ShiftStatus,
+    ShiftTemplate,
+)
 from app.models.time_entry import Absence, AbsenceStatus, AbsenceType
 
 
@@ -59,10 +66,9 @@ TOKEN_MAP: dict[str, ImportedToken] = {
     ),
     "S": ImportedToken(
         "S",
-        "Schulung",
+        "Schule Azubi",
         color="#2563EB",
-        absence_type=AbsenceType.TRAINING,
-        absence_status=AbsenceStatus.APPROVED,
+        kind=PlanningMarkerKind.INFO,
     ),
     "B": ImportedToken(
         "B",
@@ -191,6 +197,7 @@ async def import_planning_payload(
 ) -> dict[str, Any]:
     source = str(payload.get("source") or "excel-import")
     entries = payload.get("entries") or []
+    roster_names, roster_years = _extract_roster(payload)
 
     employee_result = await db.execute(select(Employee).where(Employee.is_active == True))
     employees = employee_result.scalars().all()
@@ -198,6 +205,8 @@ async def import_planning_payload(
 
     daily_tokens: dict[tuple[int, date, str], ImportedToken] = {}
     raw_entries: list[tuple[Employee, date, str]] = []
+    baseline_employees: dict[int, Employee] = {}
+    baseline_years: set[int] = set(roster_years)
     skipped: dict[str, int] = defaultdict(int)
 
     for entry in entries:
@@ -207,15 +216,25 @@ async def import_planning_payload(
             skipped["invalid_entry"] += 1
             continue
 
+        entry_date = _parse_date(entry["date"])
+        baseline_years.add(entry_date.year)
+
         employee = employees_by_name.get(normalize_name(employee_name))
         if employee is None:
             skipped["unknown_employee"] += 1
             continue
 
-        entry_date = _parse_date(entry["date"])
+        baseline_employees[employee.id] = employee
         raw_entries.append((employee, entry_date, raw_code))
         for token in split_code(raw_code):
             daily_tokens[(employee.id, entry_date, token.code)] = token
+
+    for employee_name in roster_names:
+        employee = employees_by_name.get(normalize_name(employee_name))
+        if employee is None:
+            skipped["unknown_roster_employee"] += 1
+            continue
+        baseline_employees[employee.id] = employee
 
     counts = defaultdict(int)
 
@@ -245,8 +264,18 @@ async def import_planning_payload(
         counts["duty_plan_entries"] += 1
 
     await _import_absences(db, daily_tokens, source, counts, skipped)
+    await _cancel_imported_school_absences(db, daily_tokens, source, counts)
     await _import_travel(db, daily_tokens, source, actor_id, counts)
     await _import_markers(db, daily_tokens, source, counts)
+    await _ensure_normal_weekday_assignments(
+        db,
+        list(baseline_employees.values()),
+        baseline_years,
+        source,
+        actor_id,
+        counts,
+        skipped,
+    )
 
     return {
         "source": source,
@@ -255,6 +284,36 @@ async def import_planning_payload(
         "created_or_updated": dict(counts),
         "skipped": dict(skipped),
     }
+
+
+def _extract_roster(payload: dict[str, Any]) -> tuple[set[str], set[int]]:
+    names: set[str] = set()
+    years: set[int] = set()
+
+    for raw_year in payload.get("years") or []:
+        try:
+            years.add(int(raw_year))
+        except (TypeError, ValueError):
+            continue
+
+    for item in payload.get("employees") or []:
+        if isinstance(item, str):
+            name = item.strip()
+            if name:
+                names.add(name)
+            continue
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("employee_name") or item.get("name") or "").strip()
+        if name:
+            names.add(name)
+        try:
+            if item.get("year"):
+                years.add(int(item["year"]))
+        except (TypeError, ValueError):
+            continue
+
+    return names, years
 
 
 async def _import_absences(
@@ -309,6 +368,38 @@ async def _import_absences(
                 )
             )
             counts["absences"] += 1
+
+
+async def _cancel_imported_school_absences(
+    db: AsyncSession,
+    daily_tokens: dict[tuple[int, date, str], ImportedToken],
+    source: str,
+    counts: defaultdict[str, int],
+) -> None:
+    school_dates: dict[int, set[date]] = defaultdict(set)
+    for (employee_id, entry_date, _), token in daily_tokens.items():
+        if token.code == "S":
+            school_dates[employee_id].add(entry_date)
+
+    for employee_id, dates in school_dates.items():
+        if not dates:
+            continue
+        start = min(dates)
+        end = max(dates)
+        result = await db.execute(
+            select(Absence).where(
+                Absence.employee_id == employee_id,
+                Absence.type == AbsenceType.TRAINING,
+                Absence.status.in_([AbsenceStatus.REQUESTED, AbsenceStatus.APPROVED]),
+                Absence.notes == f"Import {source}",
+                Absence.start_date <= end,
+                Absence.end_date >= start,
+            )
+        )
+        for absence in result.scalars().all():
+            if any(absence.start_date <= day <= absence.end_date for day in dates):
+                absence.status = AbsenceStatus.CANCELLED
+                counts["cancelled_school_absences"] += 1
 
 
 async def _import_travel(
@@ -383,6 +474,144 @@ async def _import_markers(
             )
         )
         counts["planning_markers"] += 1
+
+
+async def _ensure_normal_weekday_assignments(
+    db: AsyncSession,
+    employees: list[Employee],
+    years: set[int],
+    source: str,
+    actor_id: int | None,
+    counts: defaultdict[str, int],
+    skipped: defaultdict[str, int],
+) -> None:
+    if not employees or not years:
+        return
+
+    normal_template = await _ensure_normal_shift_template(db)
+    creator_id = actor_id or employees[0].id
+    employee_ids = [employee.id for employee in employees]
+
+    for year in sorted(years):
+        year_start = date(year, 1, 1)
+        year_end = date(year, 12, 31)
+        existing_result = await db.execute(
+            select(ShiftAssignment.employee_id, ShiftAssignment.date).where(
+                ShiftAssignment.employee_id.in_(employee_ids),
+                ShiftAssignment.date >= year_start,
+                ShiftAssignment.date <= year_end,
+                ShiftAssignment.status.in_(
+                    [ShiftStatus.PLANNED, ShiftStatus.CONFIRMED, ShiftStatus.SWAPPED]
+                ),
+            )
+        )
+        existing_assignments = {(employee_id, assignment_date) for employee_id, assignment_date in existing_result.all()}
+        plan_cache: dict[tuple[int, int], ShiftPlan] = {}
+
+        for employee in employees:
+            if employee.department_id is None:
+                skipped["normal_shift_no_department"] += 1
+                continue
+
+            for current in _daterange(year_start, year_end):
+                if current.weekday() >= 5:
+                    continue
+                if (employee.id, current) in existing_assignments:
+                    skipped["existing_normal_shift"] += 1
+                    continue
+
+                cache_key = (employee.department_id, current.month)
+                plan = plan_cache.get(cache_key)
+                if plan is None:
+                    plan = await _ensure_shift_plan(
+                        db,
+                        department_id=employee.department_id,
+                        year=current.year,
+                        month=current.month,
+                        creator_id=creator_id,
+                    )
+                    plan_cache[cache_key] = plan
+
+                db.add(
+                    ShiftAssignment(
+                        plan_id=plan.id,
+                        employee_id=employee.id,
+                        shift_template_id=normal_template.id,
+                        date=current,
+                        status=ShiftStatus.CONFIRMED,
+                        notes=f"Import {source}: Normaldienst 07:00-15:30, 30 Min Pause",
+                    )
+                )
+                existing_assignments.add((employee.id, current))
+                counts["normal_shift_assignments"] += 1
+
+
+async def _ensure_normal_shift_template(db: AsyncSession) -> ShiftTemplate:
+    result = await db.execute(
+        select(ShiftTemplate)
+        .where(ShiftTemplate.short_code == "D")
+        .order_by(ShiftTemplate.id)
+        .limit(1)
+    )
+    template = result.scalars().first()
+    if template is None:
+        template = ShiftTemplate(
+            name="Normaldienst",
+            short_code="D",
+            start_time=time(7, 0),
+            end_time=time(15, 30),
+            break_minutes=30,
+            crosses_midnight=False,
+            color="#2563EB",
+            department_id=None,
+            is_active=True,
+        )
+        db.add(template)
+        await db.flush()
+        return template
+
+    template.name = "Normaldienst"
+    template.start_time = time(7, 0)
+    template.end_time = time(15, 30)
+    template.break_minutes = 30
+    template.crosses_midnight = False
+    template.color = "#2563EB"
+    template.is_active = True
+    return template
+
+
+async def _ensure_shift_plan(
+    db: AsyncSession,
+    department_id: int,
+    year: int,
+    month: int,
+    creator_id: int,
+) -> ShiftPlan:
+    result = await db.execute(
+        select(ShiftPlan)
+        .where(
+            ShiftPlan.department_id == department_id,
+            ShiftPlan.year == year,
+            ShiftPlan.month == month,
+        )
+        .order_by(ShiftPlan.id)
+        .limit(1)
+    )
+    plan = result.scalars().first()
+    if plan is not None:
+        return plan
+
+    plan = ShiftPlan(
+        department_id=department_id,
+        year=year,
+        month=month,
+        status=PlanStatus.PUBLISHED,
+        created_by=creator_id,
+        published_at=datetime.utcnow(),
+    )
+    db.add(plan)
+    await db.flush()
+    return plan
 
 
 def _group_contiguous(dates: list[date]) -> list[tuple[date, date]]:
