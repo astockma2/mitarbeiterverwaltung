@@ -2,6 +2,7 @@ import math
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,13 +17,17 @@ from app.api.schemas import (
     QualificationResponse,
 )
 from app.auth.jwt import get_current_user
-from app.auth.permissions import can_view_employee, is_hr, is_manager
+from app.auth.permissions import can_view_employee, is_admin, is_hr, is_manager
 from app.database import get_db
 from app.models.employee import Employee, UserRole
 from app.models.qualification import Qualification
 from app.services.audit import log_action
 
 router = APIRouter(prefix="/employees", tags=["Mitarbeiter"])
+
+
+class PasswordResetRequest(BaseModel):
+    new_password: str = Field(min_length=8, max_length=128)
 
 
 @router.get("", response_model=PaginatedResponse)
@@ -198,6 +203,42 @@ async def deactivate_employee(
 
     employee.is_active = False
     await log_action(db, current_user.id, "DEACTIVATE", "employees", employee_id)
+
+
+@router.post("/{employee_id}/password")
+async def reset_employee_password(
+    employee_id: int,
+    data: PasswordResetRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Employee = Depends(get_current_user),
+):
+    """Setzt ein neues Login-Passwort. Nur Administratoren."""
+    if not is_admin(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Nur Administratoren duerfen Passwoerter setzen")
+
+    result = await db.execute(select(Employee).where(Employee.id == employee_id))
+    employee = result.scalar_one_or_none()
+    if employee is None:
+        raise HTTPException(status_code=404, detail="Mitarbeiter nicht gefunden")
+    if not employee.ad_username:
+        raise HTTPException(status_code=400, detail="Mitarbeiter hat keinen AD-Benutzernamen")
+
+    import bcrypt
+
+    employee.password_hash = bcrypt.hashpw(
+        data.new_password.encode("utf-8"),
+        bcrypt.gensalt(),
+    ).decode("utf-8")
+    await log_action(
+        db,
+        current_user.id,
+        "RESET_PASSWORD",
+        "employees",
+        employee_id,
+        {"ad_username": employee.ad_username},
+    )
+
+    return {"message": "Passwort wurde gesetzt"}
 
 
 # === Qualifikationen ===

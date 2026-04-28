@@ -43,6 +43,8 @@ export const createEmployee = (data: any) => api.post('/employees', data);
 
 export const updateEmployee = (id: number, data: any) =>
   api.patch(`/employees/${id}`, data);
+export const resetEmployeePassword = (id: number, newPassword: string) =>
+  api.post(`/employees/${id}/password`, { new_password: newPassword });
 
 // Departments
 export const getDepartments = () => api.get('/departments');

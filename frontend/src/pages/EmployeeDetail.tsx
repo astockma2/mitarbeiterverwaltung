@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, X, Pencil, User, MapPin, Briefcase, Phone, Shield } from 'lucide-react';
+import { ArrowLeft, Save, X, Pencil, User, MapPin, Briefcase, Phone, Shield, KeyRound } from 'lucide-react';
 import Card from '../components/Card';
-import { getEmployee, updateEmployee, getDepartments } from '../services/api';
+import { getEmployee, updateEmployee, getDepartments, resetEmployeePassword } from '../services/api';
 
 const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'Admin', HR: 'HR', DEPARTMENT_MANAGER: 'Abteilungsleitung',
@@ -41,7 +41,7 @@ interface EmployeeData {
   created_at: string;
 }
 
-export default function EmployeeDetail({ isHR }: { isHR: boolean }) {
+export default function EmployeeDetail({ isHR, isAdmin }: { isHR: boolean; isAdmin: boolean }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [employee, setEmployee] = useState<EmployeeData | null>(null);
@@ -50,6 +50,10 @@ export default function EmployeeDetail({ isHR }: { isHR: boolean }) {
   const [departments, setDepartments] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordRepeat, setPasswordRepeat] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState('');
 
   useEffect(() => {
     if (!id) return;
@@ -129,6 +133,31 @@ export default function EmployeeDetail({ isHR }: { isHR: boolean }) {
   };
 
   const setField = (key: string, value: any) => setForm((f) => ({ ...f, [key]: value }));
+
+  const savePassword = async () => {
+    if (!employee) return;
+    setError('');
+    setPasswordMessage('');
+    if (password.length < 8) {
+      setError('Das neue Passwort muss mindestens 8 Zeichen lang sein.');
+      return;
+    }
+    if (password !== passwordRepeat) {
+      setError('Die beiden Passwoerter stimmen nicht ueberein.');
+      return;
+    }
+    setPasswordSaving(true);
+    try {
+      await resetEmployeePassword(employee.id, password);
+      setPassword('');
+      setPasswordRepeat('');
+      setPasswordMessage('Passwort wurde gesetzt.');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Passwort konnte nicht gesetzt werden');
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
 
   if (!employee) {
     return <div style={{ padding: 40, color: '#64748b' }}>Laden...</div>;
@@ -303,6 +332,49 @@ export default function EmployeeDetail({ isHR }: { isHR: boolean }) {
             </div>
           </div>
         </Card>
+
+        {isAdmin && (
+          <Card>
+            <SectionTitle icon={<KeyRound size={16} />} text="Login & Passwort" />
+            <div style={{ color: '#64748b', fontSize: 13, marginBottom: 12 }}>
+              Benutzername: <span style={{ color: '#1e293b', fontWeight: 600 }}>{employee.ad_username || '--'}</span>
+            </div>
+            <div style={fieldGrid}>
+              <div style={fieldWrap}>
+                <label style={fieldLabel}>Neues Passwort</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  style={inputStyle}
+                  minLength={8}
+                  autoComplete="new-password"
+                />
+              </div>
+              <div style={fieldWrap}>
+                <label style={fieldLabel}>Wiederholen</label>
+                <input
+                  type="password"
+                  value={passwordRepeat}
+                  onChange={(event) => setPasswordRepeat(event.target.value)}
+                  style={inputStyle}
+                  minLength={8}
+                  autoComplete="new-password"
+                />
+              </div>
+            </div>
+            {passwordMessage && (
+              <div style={{ color: '#15803d', fontSize: 13, marginTop: 10 }}>{passwordMessage}</div>
+            )}
+            <button
+              onClick={savePassword}
+              disabled={passwordSaving || !employee.ad_username}
+              style={{ ...saveBtn, marginTop: 14 }}
+            >
+              <KeyRound size={15} /> {passwordSaving ? 'Setze...' : 'Passwort setzen'}
+            </button>
+          </Card>
+        )}
       </div>
     </div>
   );

@@ -18,6 +18,7 @@ import Tickets from './pages/Tickets';
 
 export default function App() {
   const { user, loading, logout, isHR, isManager } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
 
   if (loading) {
     return (
@@ -46,7 +47,7 @@ export default function App() {
             <Route path="/chat" element={<Chat userId={user.id} />} />
             <Route path="/tickets" element={<Tickets isHR={isHR} />} />
             {isHR && <Route path="/employees" element={<Employees />} />}
-            <Route path="/employees/:id" element={<EmployeeDetail isHR={isHR} />} />
+            <Route path="/employees/:id" element={<EmployeeDetail isHR={isHR} isAdmin={isAdmin} />} />
             {isHR && <Route path="/departments" element={<Departments />} />}
             {isManager && <Route path="/shift-plans" element={<DutyPlanning isHR={isHR} />} />}
             {isManager && <Route path="/shift-plans/monthly" element={<ShiftPlans />} />}

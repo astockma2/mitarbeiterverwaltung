@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="MVA">
+  <defs>
+    <linearGradient id="mva-bg" x1="10" y1="6" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2563eb"/>
+      <stop offset="0.55" stop-color="#0f766e"/>
+      <stop offset="1" stop-color="#22c55e"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#mva-bg)"/>
+  <path d="M17 43V21h6l9 12 9-12h6v22h-6V31l-7 9h-4l-7-9v12z" fill="#fff"/>
+  <path d="M14 49h36" stroke="#d9f99d" stroke-width="4" stroke-linecap="round"/>
+</svg>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Users, Clock, CalendarDays, TrendingUp } from 'lucide-react';
+import type { CSSProperties } from 'react';
+import { Users, Clock, CalendarDays, TrendingUp, Download, Smartphone } from 'lucide-react';
 import Card, { StatCard } from '../components/Card';
 import { getDashboard, getClockStatus, getMonthlySummary, getVacationBalance } from '../services/api';
 
@@ -13,6 +14,7 @@ export default function Dashboard({ user, isHR }: Props) {
   const [clockStatus, setClockStatus] = useState<any>(null);
   const [monthly, setMonthly] = useState<any>(null);
   const [vacation, setVacation] = useState<any>(null);
+  const appDownloadUrl = 'https://downloads.c3po42.de/mva/app-release.apk';
 
   useEffect(() => {
     getClockStatus().then((r) => setClockStatus(r.data)).catch(() => {});
@@ -62,6 +64,32 @@ export default function Dashboard({ user, isHR }: Props) {
         />
       </div>
 
+      <Card style={{ marginBottom: 24 }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1fr) 112px',
+          gap: 18,
+          alignItems: 'center',
+        }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#1e293b', fontWeight: 700, marginBottom: 6 }}>
+              <Smartphone size={18} />
+              Handy-App
+            </div>
+            <div style={{ color: '#64748b', fontSize: 13, marginBottom: 12 }}>
+              Android APK fuer MVA
+            </div>
+            <a href={appDownloadUrl} style={downloadButtonStyle}>
+              <Download size={16} />
+              APK herunterladen
+            </a>
+          </div>
+          <a href={appDownloadUrl} title="Handy-App herunterladen" style={qrLinkStyle}>
+            <img src="/app-download-qr.svg" alt="QR-Code fuer den Handy-App Download" style={{ width: 104, height: 104, display: 'block' }} />
+          </a>
+        </div>
+      </Card>
+
       {/* Monatsdetails */}
       {monthly && (
         <Card title={`Monatsübersicht ${monthly.month}/${monthly.year}`} style={{ marginBottom: 24 }}>
@@ -109,3 +137,28 @@ export default function Dashboard({ user, isHR }: Props) {
     </div>
   );
 }
+
+const downloadButtonStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 8,
+  minHeight: 36,
+  padding: '0 12px',
+  borderRadius: 8,
+  background: '#2563eb',
+  color: '#ffffff',
+  fontSize: 13,
+  fontWeight: 700,
+  textDecoration: 'none',
+};
+
+const qrLinkStyle: CSSProperties = {
+  width: 112,
+  height: 112,
+  borderRadius: 8,
+  border: '1px solid #e2e8f0',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: '#ffffff',
+};
