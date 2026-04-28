@@ -727,9 +727,17 @@ async def my_schedule(
     )
     assignments = result.scalars().all()
     extras_by_date = await _schedule_extras_by_date(db, current_user.id, start_date, end_date)
-    assigned_dates = {assignment.date for assignment in assignments}
+    blocked_dates = {
+        day
+        for day, extras in extras_by_date.items()
+        if any(extra.type == "absence" for extra in extras)
+    }
+    visible_assignments = [
+        assignment for assignment in assignments if assignment.date not in blocked_dates
+    ]
+    assigned_dates = {assignment.date for assignment in visible_assignments}
 
-    responses = [_assignment_to_response(a, extras_by_date.get(a.date, [])) for a in assignments]
+    responses = [_assignment_to_response(a, extras_by_date.get(a.date, [])) for a in visible_assignments]
     responses.extend(
         _virtual_schedule_response(current_user, day, extras)
         for day, extras in extras_by_date.items()
@@ -1100,9 +1108,9 @@ async def _schedule_extras_by_date(
         for day in _date_range(max(travel.start_date, start_date), min(travel.end_date, end_date)):
             extras[day].append(
                 ScheduleExtra(
-                    type="travel",
+                    type="absence",
                     code="DR",
-                    label=travel.destination,
+                    label=f"Dienstreise: {travel.destination}",
                     status=travel.status.value,
                     color="#65A30D",
                 )
@@ -1181,7 +1189,6 @@ def _absence_color(absence: Absence) -> str:
 def _schedule_extra_order(item_type: str) -> int:
     order = {
         "absence": 0,
-        "travel": 1,
         "duty": 2,
         "info": 3,
     }

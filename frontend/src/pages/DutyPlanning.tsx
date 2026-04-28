@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -6,6 +6,9 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  ClipboardCopy,
+  Eraser,
+  Mail,
   Plane,
   RefreshCw,
   Table2,
@@ -18,6 +21,7 @@ import {
   getPendingTravelRequests,
   getPlanningCalendar,
   reviewTravelRequest,
+  savePlanningCells,
 } from '../services/api';
 
 const MONTH_NAMES = [
@@ -40,6 +44,7 @@ const DAY_WIDTH = 34;
 const NAME_WIDTH = 190;
 
 type ViewMode = 'year' | 'month';
+type PlanningToolCode = 'D' | 'B' | 'H' | 'T' | 'S' | 'U' | 'Ug' | 'A' | 'DR' | 'CLEAR';
 
 type PlanningEvent = {
   id: number;
@@ -90,7 +95,30 @@ type Department = {
 
 type Props = {
   isHR: boolean;
+  isManager: boolean;
 };
+
+type PlanningTool = {
+  code: PlanningToolCode;
+  label: string;
+  color: string;
+  tone: string;
+};
+
+const PLANNING_TOOLS: PlanningTool[] = [
+  { code: 'D', label: 'Dienst', color: '#2563EB', tone: '#DBEAFE' },
+  { code: 'B', label: 'Bereit', color: '#C2410C', tone: '#FFEDD5' },
+  { code: 'H', label: 'Hotline', color: '#16A34A', tone: '#DCFCE7' },
+  { code: 'T', label: 'Team', color: '#1D4ED8', tone: '#DBEAFE' },
+  { code: 'S', label: 'Schule', color: '#2563EB', tone: '#E0E7FF' },
+  { code: 'U', label: 'Urlaub', color: '#D97706', tone: '#FEF3C7' },
+  { code: 'Ug', label: 'Geplant', color: '#0EA5E9', tone: '#E0F2FE' },
+  { code: 'A', label: 'AZA', color: '#E11D48', tone: '#FFE4E6' },
+  { code: 'DR', label: 'Reise', color: '#65A30D', tone: '#ECFCCB' },
+  { code: 'CLEAR', label: 'Leeren', color: '#475569', tone: '#F1F5F9' },
+];
+
+const TOOL_BY_CODE = Object.fromEntries(PLANNING_TOOLS.map((tool) => [tool.code, tool])) as Record<PlanningToolCode, PlanningTool>;
 
 const STATUS_LABELS: Record<string, string> = {
   REQUESTED: 'Beantragt',
@@ -154,7 +182,7 @@ function groupMonthHeaders(days: string[]) {
   return groups;
 }
 
-export default function DutyPlanning({ isHR }: Props) {
+export default function DutyPlanning({ isHR, isManager }: Props) {
   const today = new Date();
   const [mode, setMode] = useState<ViewMode>('year');
   const [year, setYear] = useState(today.getFullYear());
@@ -163,6 +191,10 @@ export default function DutyPlanning({ isHR }: Props) {
   const [calendar, setCalendar] = useState<PlanningCalendar | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [pendingTravel, setPendingTravel] = useState<TravelRequest[]>([]);
+  const [selectedTool, setSelectedTool] = useState<PlanningToolCode>('D');
+  const [painting, setPainting] = useState(false);
+  const [paintPreview, setPaintPreview] = useState<Map<string, string | null>>(new Map());
+  const paintBufferRef = useRef<Map<string, { employee_id: number; date: string; code: string | null }>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [travelForm, setTravelForm] = useState({
@@ -214,6 +246,7 @@ export default function DutyPlanning({ isHR }: Props) {
   const employees = calendar?.employees || [];
   const days = calendar?.days || [];
   const monthHeaders = useMemo(() => groupMonthHeaders(days), [days]);
+  const canEditMonth = isManager && mode === 'month';
 
   const setPrevious = () => {
     if (mode === 'year') {
@@ -281,6 +314,54 @@ export default function DutyPlanning({ isHR }: Props) {
     await load();
   };
 
+  const paintCell = useCallback((employee: PlanningEmployee, day: PlanningDay) => {
+    if (!canEditMonth) return;
+    const code = selectedTool === 'CLEAR' ? null : selectedTool;
+    const key = `${employee.id}:${day.date}`;
+    paintBufferRef.current.set(key, { employee_id: employee.id, date: day.date, code });
+    setPaintPreview((current) => {
+      const next = new Map(current);
+      next.set(key, code);
+      return next;
+    });
+  }, [canEditMonth, selectedTool]);
+
+  const beginPaint = useCallback((employee: PlanningEmployee, day: PlanningDay) => {
+    if (!canEditMonth) return;
+    paintBufferRef.current = new Map();
+    setPaintPreview(new Map());
+    setPainting(true);
+    paintCell(employee, day);
+  }, [canEditMonth, paintCell]);
+
+  const finishPaint = useCallback(async () => {
+    if (!painting) return;
+    setPainting(false);
+    const entries = Array.from(paintBufferRef.current.values());
+    paintBufferRef.current = new Map();
+    if (entries.length === 0) return;
+
+    setError('');
+    try {
+      await savePlanningCells(entries);
+      setPaintPreview(new Map());
+      await load();
+    } catch (saveError: any) {
+      setError(saveError.response?.data?.detail || 'Planungszellen konnten nicht gespeichert werden');
+      setPaintPreview(new Map());
+      await load();
+    }
+  }, [load, painting]);
+
+  useEffect(() => {
+    if (!painting) return undefined;
+    const stopPainting = () => {
+      void finishPaint();
+    };
+    window.addEventListener('mouseup', stopPainting);
+    return () => window.removeEventListener('mouseup', stopPainting);
+  }, [finishPaint, painting]);
+
   const title = mode === 'year' ? String(year) : `${MONTH_NAMES[month - 1]} ${year}`;
   const totalEvents = employees.reduce(
     (sum, employee) => sum + employee.days.reduce((daySum, day) => daySum + day.events.length, 0),
@@ -288,7 +369,7 @@ export default function DutyPlanning({ isHR }: Props) {
   );
   const totalTravel = employees.reduce(
     (sum, employee) =>
-      sum + employee.days.reduce((daySum, day) => daySum + day.events.filter((item) => item.type === 'travel').length, 0),
+      sum + employee.days.reduce((daySum, day) => daySum + day.events.filter((item) => item.code === 'DR').length, 0),
     0
   );
 
@@ -373,7 +454,11 @@ export default function DutyPlanning({ isHR }: Props) {
               <div style={{ fontWeight: 700, color: '#1e293b' }}>
                 {mode === 'year' ? 'Jahresansicht' : 'Monatsansicht'}
               </div>
-              <Legend />
+              {canEditMonth ? (
+                <PlanningToolbox selectedTool={selectedTool} onSelect={setSelectedTool} />
+              ) : (
+                <Legend />
+              )}
             </div>
             <PlanningTable
               mode={mode}
@@ -382,12 +467,18 @@ export default function DutyPlanning({ isHR }: Props) {
               monthHeaders={monthHeaders}
               loading={loading}
               onOpenMonth={openMonth}
+              canEdit={canEditMonth}
+              paintPreview={paintPreview}
+              onBeginPaint={beginPaint}
+              onPaintCell={paintCell}
             />
           </Card>
         </div>
 
         <aside style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 280 }}>
-          <Card title="Dienstreise">
+          <Card title="Kartei Abwesenheiten">
+            <AbsenceSummary calendar={calendar} />
+            <div style={cardSubheadingStyle}>Dienstreise</div>
             <form onSubmit={submitTravel} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <select
                 value={travelForm.employee_id}
@@ -488,6 +579,8 @@ export default function DutyPlanning({ isHR }: Props) {
               </div>
             )}
           </Card>
+
+          <ReadinessMailCard calendar={calendar} year={year} month={month} />
         </aside>
       </div>
     </div>
@@ -501,6 +594,10 @@ function PlanningTable({
   monthHeaders,
   loading,
   onOpenMonth,
+  canEdit,
+  paintPreview,
+  onBeginPaint,
+  onPaintCell,
 }: {
   mode: ViewMode;
   days: string[];
@@ -508,6 +605,10 @@ function PlanningTable({
   monthHeaders: Array<{ month: number; label: string; count: number }>;
   loading: boolean;
   onOpenMonth: (day: string) => void;
+  canEdit: boolean;
+  paintPreview: Map<string, string | null>;
+  onBeginPaint: (employee: PlanningEmployee, day: PlanningDay) => void;
+  onPaintCell: (employee: PlanningEmployee, day: PlanningDay) => void;
 }) {
   const tableWidth = NAME_WIDTH + days.length * DAY_WIDTH;
 
@@ -578,7 +679,15 @@ function PlanningTable({
                 <div style={{ color: '#94a3b8', fontSize: 10 }}>{employee.department_name || 'Ohne Abteilung'}</div>
               </td>
               {employee.days.map((day) => (
-                <CalendarCell key={`${employee.id}-${day.date}`} day={day} compact={mode === 'year'} />
+                <CalendarCell
+                  key={`${employee.id}-${day.date}`}
+                  day={day}
+                  compact={mode === 'year'}
+                  draftCode={paintPreview.get(`${employee.id}:${day.date}`)}
+                  canEdit={canEdit}
+                  onMouseDown={() => onBeginPaint(employee, day)}
+                  onMouseEnter={() => onPaintCell(employee, day)}
+                />
               ))}
             </tr>
           ))}
@@ -595,14 +704,38 @@ function PlanningTable({
   );
 }
 
-function CalendarCell({ day, compact }: { day: PlanningDay; compact: boolean }) {
-  const primary = day.events[0];
-  const hasConflict = day.events.some((event) => event.type === 'absence') &&
-    day.events.some((event) => event.type === 'shift' || event.type === 'duty');
+function CalendarCell({
+  day,
+  compact,
+  draftCode,
+  canEdit,
+  onMouseDown,
+  onMouseEnter,
+}: {
+  day: PlanningDay;
+  compact: boolean;
+  draftCode?: string | null;
+  canEdit: boolean;
+  onMouseDown: () => void;
+  onMouseEnter: () => void;
+}) {
+  const previewEvent = draftCode === undefined ? null : previewPlanningEvent(draftCode);
+  const events = previewEvent ? [previewEvent] : draftCode === null ? [] : day.events;
+  const primary = events[0];
+  const hasConflict = events.some((event) => event.type === 'absence') &&
+    events.some((event) => event.type === 'shift' || event.type === 'duty');
 
   return (
     <td
-      title={day.events.map(eventTitle).join('\n')}
+      onMouseDown={(event) => {
+        if (!canEdit) return;
+        event.preventDefault();
+        onMouseDown();
+      }}
+      onMouseEnter={() => {
+        if (canEdit) onMouseEnter();
+      }}
+      title={events.map(eventTitle).join('\n')}
       style={{
         width: DAY_WIDTH,
         minWidth: DAY_WIDTH,
@@ -613,16 +746,18 @@ function CalendarCell({ day, compact }: { day: PlanningDay; compact: boolean }) 
         textAlign: 'center',
         verticalAlign: 'top',
         padding: compact ? 1 : 3,
+        cursor: canEdit ? 'crosshair' : 'default',
+        userSelect: 'none',
       }}
     >
       {compact ? (
         <div style={{ fontSize: 10, fontWeight: 800, color: primary?.color || '#cbd5e1', lineHeight: '20px' }}>
           {primary?.code || ''}
-          {day.events.length > 1 ? '+' : ''}
+          {events.length > 1 ? '+' : ''}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {day.events.slice(0, 3).map((event, index) => (
+          {events.slice(0, 3).map((event, index) => (
             <span
               key={`${event.type}-${event.id}-${index}`}
               style={{
@@ -640,11 +775,215 @@ function CalendarCell({ day, compact }: { day: PlanningDay; compact: boolean }) 
               {event.code}
             </span>
           ))}
-          {day.events.length > 3 && <span style={{ color: '#64748b', fontSize: 10 }}>+{day.events.length - 3}</span>}
+          {events.length > 3 && <span style={{ color: '#64748b', fontSize: 10 }}>+{events.length - 3}</span>}
         </div>
       )}
     </td>
   );
+}
+
+function previewPlanningEvent(code: string | null): PlanningEvent | null {
+  if (code === null) return null;
+  const tool = TOOL_BY_CODE[code as PlanningToolCode];
+  if (!tool) return null;
+  const type = code === 'D' ? 'shift' : ['U', 'Ug', 'A', 'DR'].includes(code) ? 'absence' : ['B', 'H'].includes(code) ? 'duty' : 'info';
+  return {
+    id: -1,
+    type,
+    code,
+    label: tool.label,
+    status: 'VORSCHAU',
+    color: tool.color,
+  };
+}
+
+function PlanningToolbox({
+  selectedTool,
+  onSelect,
+}: {
+  selectedTool: PlanningToolCode;
+  onSelect: (tool: PlanningToolCode) => void;
+}) {
+  return (
+    <div style={toolboxStyle}>
+      {PLANNING_TOOLS.map((tool) => {
+        const active = selectedTool === tool.code;
+        const isClear = tool.code === 'CLEAR';
+        return (
+          <button
+            key={tool.code}
+            type="button"
+            onClick={() => onSelect(tool.code)}
+            title={tool.label}
+            style={{
+              ...toolButtonStyle,
+              borderColor: active ? tool.color : '#cbd5e1',
+              background: active ? tool.tone : '#ffffff',
+              color: tool.color,
+              boxShadow: active ? `inset 0 0 0 1px ${tool.color}` : 'none',
+            }}
+          >
+            {isClear ? <Eraser size={14} /> : <span>{tool.code}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function AbsenceSummary({ calendar }: { calendar: PlanningCalendar | null }) {
+  const counts = useMemo(() => {
+    const initial: Record<string, number> = { U: 0, Ug: 0, A: 0, DR: 0 };
+    for (const employee of calendar?.employees || []) {
+      for (const day of employee.days) {
+        for (const event of day.events) {
+          if (event.type === 'absence' && initial[event.code] !== undefined) {
+            initial[event.code] += 1;
+          }
+        }
+      }
+    }
+    return initial;
+  }, [calendar]);
+
+  return (
+    <div style={absenceSummaryStyle}>
+      <SummaryPill label="Urlaub" value={counts.U} color="#D97706" />
+      <SummaryPill label="Geplant" value={counts.Ug} color="#0EA5E9" />
+      <SummaryPill label="AZA" value={counts.A} color="#E11D48" />
+      <SummaryPill label="Reisen" value={counts.DR} color="#65A30D" />
+    </div>
+  );
+}
+
+function SummaryPill({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div style={{ ...summaryPillStyle, borderColor: `${color}55`, background: `${color}12` }}>
+      <span style={{ color }}>{label}</span>
+      <strong style={{ color: '#0f172a' }}>{value}</strong>
+    </div>
+  );
+}
+
+function ReadinessMailCard({
+  calendar,
+  year,
+  month,
+}: {
+  calendar: PlanningCalendar | null;
+  year: number;
+  month: number;
+}) {
+  const [copied, setCopied] = useState(false);
+  const weeks = useMemo(() => buildReadinessWeeks(calendar, year, month), [calendar, year, month]);
+  const mailText = useMemo(() => buildReadinessMailText(weeks, year, month), [weeks, year, month]);
+  const subject = `IT-Bereitschaft ${MONTH_NAMES[month - 1]} ${year}`;
+  const mailto = `mailto:IT-Bereitschaft@ilm-kreis-kliniken.de?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(mailText)}`;
+
+  const copyMail = async () => {
+    await navigator.clipboard?.writeText(mailText);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  };
+
+  return (
+    <Card title="Karteikarte Bereitschaft-Mail">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {weeks.length === 0 ? (
+          <div style={{ color: '#94a3b8', fontSize: 13 }}>Keine Bereitschaft im Monat</div>
+        ) : (
+          weeks.map((week) => (
+            <div key={week.key} style={readinessWeekStyle}>
+              <div style={{ fontWeight: 800, color: '#0f172a', fontSize: 13 }}>{week.label}</div>
+              <div style={{ color: '#475569', fontSize: 12 }}>{week.names.join(', ')}</div>
+            </div>
+          ))
+        )}
+        <div style={mailTemplateStyle}>
+          {mailText.split('\n').slice(0, 9).map((line, index) => (
+            <div key={`${line}-${index}`}>{line || '\u00a0'}</div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" onClick={() => void copyMail()} style={secondaryButtonStyle}>
+            <ClipboardCopy size={16} />
+            {copied ? 'Kopiert' : 'Kopieren'}
+          </button>
+          <a href={mailto} style={secondaryButtonStyle}>
+            <Mail size={16} />
+            Mail
+          </a>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function buildReadinessWeeks(calendar: PlanningCalendar | null, year: number, month: number) {
+  const weeks = new Map<string, { key: string; label: string; names: string[]; start: Date }>();
+  for (const employee of calendar?.employees || []) {
+    for (const day of employee.days) {
+      const parsed = localDate(day.date);
+      if (parsed.getFullYear() !== year || parsed.getMonth() + 1 !== month) continue;
+      if (!day.events.some((event) => event.code === 'B')) continue;
+      const start = weekStart(parsed);
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      const key = start.toISOString().slice(0, 10);
+      const existing = weeks.get(key) || {
+        key,
+        start,
+        label: `${pad(start.getDate())}.${pad(start.getMonth() + 1)}. - ${pad(end.getDate())}.${pad(end.getMonth() + 1)}.`,
+        names: [],
+      };
+      if (!existing.names.includes(employee.name)) {
+        existing.names.push(employee.name);
+      }
+      weeks.set(key, existing);
+    }
+  }
+  return Array.from(weeks.values()).sort((a, b) => a.start.getTime() - b.start.getTime());
+}
+
+function buildReadinessMailText(
+  weeks: Array<{ label: string; names: string[] }>,
+  year: number,
+  month: number,
+) {
+  const weekLines = weeks.length
+    ? weeks.map((week) => `${week.label} ${week.names.join(', ')}`)
+    : ['Keine Bereitschaft eingetragen'];
+  return [
+    `Bereitschaft ${MONTH_NAMES[month - 1]} ${year}`,
+    '',
+    ...weekLines,
+    '',
+    'Bereitschaftszeiten:',
+    'Mo-Fr ab 06:00 Uhr immer erst 50881 anrufen',
+    'ab 15:30 Uhr noch 50884 probieren',
+    'Verhaltensregeln ausserhalb der Bereitschaftszeiten siehe VA Rufbereitschaft der Abteilung IT',
+    '',
+    'Alarmierung per MAIL an: IT-Bereitschaft@ilm-kreis-kliniken.de',
+    'Telefonnummern nur nutzen, wenn der Notruf ueber Programm/Mail nicht funktioniert oder innerhalb von 30 Minuten keine Rueckmeldung erfolgt.',
+    'Diese Telefonnummern sind nicht weiterzugeben!',
+    '',
+    'Ansprechpartner:',
+    'Holger Enig: 0174 3473241 / holger.enig@gmx.de',
+    'Tom Scheike: 0162 1991424 / Tom.Scheike.Hotline@mail.de',
+    'Andre Stoecklein: 0174 3473244 / bereitschaft-ikk@gmx.de',
+    'Peter Czaikowski: 0174 3473245 / peter.czaikowski@ilm-kreis-kliniken.de',
+    'Ronny Weise: 01525 9753522 / ronny.weise@ilm-kreis-kliniken.de',
+    'Marc Nitsch: 0174 3473243 / marc.nitsch@ilm-kreis-kliniken.de',
+  ].join('\n');
+}
+
+function weekStart(value: Date) {
+  const start = new Date(value);
+  const day = start.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  start.setDate(start.getDate() + diff);
+  start.setHours(0, 0, 0, 0);
+  return start;
 }
 
 function Metric({ label, value }: { label: string; value: string | number }) {
@@ -786,6 +1125,73 @@ const calendarHeaderStyle: CSSProperties = {
   padding: '12px 14px',
   borderBottom: '1px solid #e2e8f0',
   flexWrap: 'wrap',
+};
+
+const toolboxStyle: CSSProperties = {
+  display: 'flex',
+  gap: 6,
+  flexWrap: 'wrap',
+  alignItems: 'center',
+};
+
+const toolButtonStyle: CSSProperties = {
+  width: 34,
+  height: 28,
+  border: '1px solid #cbd5e1',
+  borderRadius: 7,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: 11,
+  fontWeight: 900,
+  cursor: 'pointer',
+  padding: 0,
+};
+
+const cardSubheadingStyle: CSSProperties = {
+  margin: '12px 0 8px',
+  fontSize: 13,
+  fontWeight: 800,
+  color: '#0f172a',
+};
+
+const absenceSummaryStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: 8,
+  marginBottom: 8,
+};
+
+const summaryPillStyle: CSSProperties = {
+  minHeight: 42,
+  border: '1px solid #e2e8f0',
+  borderRadius: 8,
+  padding: '7px 9px',
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  fontSize: 12,
+  fontWeight: 800,
+};
+
+const readinessWeekStyle: CSSProperties = {
+  border: '1px solid #e2e8f0',
+  borderRadius: 8,
+  background: '#f8fafc',
+  padding: '8px 10px',
+};
+
+const mailTemplateStyle: CSSProperties = {
+  border: '1px solid #e2e8f0',
+  borderRadius: 8,
+  background: '#ffffff',
+  color: '#475569',
+  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+  fontSize: 11,
+  lineHeight: 1.5,
+  padding: 10,
+  maxHeight: 160,
+  overflow: 'hidden',
 };
 
 const headerCellStyle: CSSProperties = {

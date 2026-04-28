@@ -94,6 +94,9 @@ export const getPlanningCalendar = (params: {
   end_date: string;
   department_id?: number | string;
 }) => api.get('/planning/calendar', { params });
+export const savePlanningCells = (
+  entries: Array<{ employee_id: number; date: string; code: string | null }>
+) => api.put('/planning/cells', { entries });
 export const createTravelRequest = (data: {
   employee_id?: number;
   start_date: string;

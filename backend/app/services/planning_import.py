@@ -237,6 +237,7 @@ async def import_planning_payload(
         baseline_employees[employee.id] = employee
 
     counts = defaultdict(int)
+    blocking_dates = _blocking_dates_by_employee(daily_tokens)
 
     for employee, entry_date, raw_code in raw_entries:
         existing_result = await db.execute(
@@ -267,10 +268,12 @@ async def import_planning_payload(
     await _cancel_imported_school_absences(db, daily_tokens, source, counts)
     await _import_travel(db, daily_tokens, source, actor_id, counts)
     await _import_markers(db, daily_tokens, source, counts)
+    await _cancel_blocked_normal_assignments(db, blocking_dates, source, counts)
     await _ensure_normal_weekday_assignments(
         db,
         list(baseline_employees.values()),
         baseline_years,
+        blocking_dates,
         source,
         actor_id,
         counts,
@@ -314,6 +317,16 @@ def _extract_roster(payload: dict[str, Any]) -> tuple[set[str], set[int]]:
             continue
 
     return names, years
+
+
+def _blocking_dates_by_employee(
+    daily_tokens: dict[tuple[int, date, str], ImportedToken],
+) -> dict[int, set[date]]:
+    dates: dict[int, set[date]] = defaultdict(set)
+    for (employee_id, entry_date, _), token in daily_tokens.items():
+        if token.absence_type or token.is_travel or token.kind == PlanningMarkerKind.ABSENCE:
+            dates[employee_id].add(entry_date)
+    return dates
 
 
 async def _import_absences(
@@ -476,10 +489,45 @@ async def _import_markers(
         counts["planning_markers"] += 1
 
 
+async def _cancel_blocked_normal_assignments(
+    db: AsyncSession,
+    blocking_dates: dict[int, set[date]],
+    source: str,
+    counts: defaultdict[str, int],
+) -> None:
+    employee_ids = [employee_id for employee_id, dates in blocking_dates.items() if dates]
+    if not employee_ids:
+        return
+
+    all_dates = [day for dates in blocking_dates.values() for day in dates]
+    start = min(all_dates)
+    end = max(all_dates)
+    result = await db.execute(
+        select(ShiftAssignment)
+        .join(ShiftTemplate, ShiftAssignment.shift_template_id == ShiftTemplate.id)
+        .where(
+            ShiftAssignment.employee_id.in_(employee_ids),
+            ShiftAssignment.date >= start,
+            ShiftAssignment.date <= end,
+            ShiftAssignment.status.in_(
+                [ShiftStatus.PLANNED, ShiftStatus.CONFIRMED, ShiftStatus.SWAPPED]
+            ),
+            ShiftTemplate.short_code == "D",
+        )
+    )
+    for assignment in result.scalars().all():
+        if assignment.date not in blocking_dates.get(assignment.employee_id, set()):
+            continue
+        assignment.status = ShiftStatus.CANCELLED
+        assignment.notes = f"{assignment.notes or ''}\nBlockiert durch Import-Abwesenheit {source}".strip()
+        counts["cancelled_blocked_normal_shifts"] += 1
+
+
 async def _ensure_normal_weekday_assignments(
     db: AsyncSession,
     employees: list[Employee],
     years: set[int],
+    blocking_dates: dict[int, set[date]],
     source: str,
     actor_id: int | None,
     counts: defaultdict[str, int],
@@ -515,6 +563,9 @@ async def _ensure_normal_weekday_assignments(
 
             for current in _daterange(year_start, year_end):
                 if current.weekday() >= 5:
+                    continue
+                if current in blocking_dates.get(employee.id, set()):
+                    skipped["normal_shift_blocked_by_absence"] += 1
                     continue
                 if (employee.id, current) in existing_assignments:
                     skipped["existing_normal_shift"] += 1
