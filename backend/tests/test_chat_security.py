@@ -109,6 +109,7 @@ def _make_user(user_id: int):
 def _make_db_with_existing_token(owner_id: int | None):
     """Erstellt eine Mock-DB, die optional einen vorhandenen DeviceToken zurückgibt."""
     db = AsyncMock()
+    db.add = MagicMock()
     if owner_id is not None:
         token = MagicMock()
         token.employee_id = owner_id
@@ -247,7 +248,7 @@ async def test_send_message_ruft_push_notification_auf():
         obj.message_type = "TEXT"
         obj.file_path = None
 
-    db.add.side_effect = fake_add
+    db.add = MagicMock(side_effect=fake_add)
 
     data = MessageCreate(content="Hallo Welt", message_type="TEXT")
     background_tasks = BackgroundTasks()

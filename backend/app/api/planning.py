@@ -146,6 +146,24 @@ MARKER_CELL_CODES: dict[str, tuple[str, PlanningMarkerKind, str]] = {
 
 DUTY_CELL_CODES = {"D", "B", "H", "I", "M"}
 
+DUTY_ENTRY_EVENTS: dict[str, tuple[str, str, str]] = {
+    "D": ("Normaldienst", "shift", "#2563EB"),
+    "U": ("Urlaub", "absence", "#FACC15"),
+    "Ug": ("Urlaub geplant", "absence", "#0EA5E9"),
+    "A": ("Arbeitszeitausgleich", "absence", "#FB7185"),
+    "DR": ("Dienstreise", "absence", "#65A30D"),
+    "B": ("Bereitschaft", "duty", "#C2410C"),
+    "H": ("Hotlinedienst", "duty", "#16A34A"),
+    "T": ("Teammeeting", "info", "#1D4ED8"),
+    "S": ("Schule Azubi", "info", "#2563EB"),
+    "I": ("Ilmenau", "duty", "#F97316"),
+    "M": ("MVZ", "duty", "#EAB308"),
+    "K": ("Kur", "absence", "#FB923C"),
+    "su": ("Security Update Day", "info", "#F43F5E"),
+    "Ez": ("Elternzeit", "absence", "#D97706"),
+    "TSC": ("Zeitreduzierung TSC", "info", "#315D1E"),
+}
+
 
 @router.get("/calendar", response_model=PlanningCalendarResponse)
 async def get_planning_calendar(
@@ -173,6 +191,7 @@ async def get_planning_calendar(
         await _add_absence_events(db, employee_ids, start_date, end_date, by_employee_day)
         await _add_travel_events(db, employee_ids, start_date, end_date, by_employee_day)
         await _add_marker_events(db, employee_ids, start_date, end_date, by_employee_day)
+        await _add_duty_plan_entry_events(db, employee_ids, start_date, end_date, by_employee_day)
         _hide_shift_events_on_absence_days(by_employee_day)
 
     return PlanningCalendarResponse(
@@ -257,6 +276,13 @@ async def upsert_planning_cells(
             )
             continue
 
+        await _clear_manual_cell(
+            db,
+            employee.id,
+            cell.date,
+            current_user.id,
+            cancel_normal_shift=code == "D" or code in ABSENCE_CELL_CODES or code == "DR",
+        )
         if code in DUTY_CELL_CODES and await _has_blocking_absence(db, employee.id, cell.date):
             raise HTTPException(
                 status_code=409,
@@ -564,6 +590,7 @@ async def _clear_manual_cell(
     employee_id: int,
     entry_date: date,
     actor_id: int,
+    cancel_normal_shift: bool = True,
 ) -> None:
     duty_result = await db.execute(
         select(DutyPlanEntry).where(
@@ -607,7 +634,8 @@ async def _clear_manual_cell(
     for travel in travel_result.scalars().all():
         travel.status = TravelStatus.CANCELLED
 
-    await _cancel_normal_shift(db, employee_id, entry_date, actor_id)
+    if cancel_normal_shift:
+        await _cancel_normal_shift(db, employee_id, entry_date, actor_id)
 
 
 async def _has_blocking_absence(db: AsyncSession, employee_id: int, entry_date: date) -> bool:
@@ -998,6 +1026,42 @@ async def _add_marker_events(
         )
 
 
+async def _add_duty_plan_entry_events(
+    db: AsyncSession,
+    employee_ids: list[int],
+    start_date: date,
+    end_date: date,
+    by_employee_day: dict[int, dict[date, list[PlanningEventResponse]]],
+) -> None:
+    result = await db.execute(
+        select(DutyPlanEntry).where(
+            DutyPlanEntry.employee_id.in_(employee_ids),
+            DutyPlanEntry.date >= start_date,
+            DutyPlanEntry.date <= end_date,
+        )
+    )
+    for entry in result.scalars().all():
+        events = by_employee_day[entry.employee_id][entry.date]
+        code = _normalize_duty_entry_code(entry.code)
+        if any(_normalize_duty_entry_code(event.code) == code for event in events):
+            continue
+        label, event_type, color = DUTY_ENTRY_EVENTS.get(
+            code,
+            (f"Planungscode {entry.code}", "info", "#64748B"),
+        )
+        events.append(
+            PlanningEventResponse(
+                id=entry.id,
+                type=event_type,
+                code=code,
+                label=label,
+                status="IMPORTED" if not entry.note else "PLANNED",
+                color=color,
+                source=entry.note or "duty-plan",
+            )
+        )
+
+
 def _hide_shift_events_on_absence_days(
     by_employee_day: dict[int, dict[date, list[PlanningEventResponse]]],
 ) -> None:
@@ -1052,6 +1116,20 @@ def _absence_color(absence: Absence) -> str:
         AbsenceType.COMP_TIME: "#FB7185",
     }
     return colors.get(absence.type, "#64748B")
+
+
+def _normalize_duty_entry_code(raw_code: str | None) -> str:
+    code = _normalize_cell_code(raw_code)
+    if code is None:
+        return ""
+    lookup = {
+        "dr": "DR",
+        "ug": "Ug",
+        "ez": "Ez",
+        "su": "su",
+        "tsc": "TSC",
+    }
+    return lookup.get(code.lower(), code)
 
 
 def _event_order(event_type: str) -> int:

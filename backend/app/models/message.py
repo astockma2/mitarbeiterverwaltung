@@ -6,10 +6,19 @@ from sqlalchemy import (
     Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Enum as SAEnum,
 )
 from sqlalchemy.orm import relationship
+from pydantic import BaseModel, Field
 
 from app.database import Base
 
 import enum
+
+
+MAX_MESSAGE_LENGTH = 10_000
+
+
+class MessageCreate(BaseModel):
+    content: str = Field(..., min_length=1, max_length=MAX_MESSAGE_LENGTH)
+    message_type: str = "TEXT"
 
 
 class ConversationType(str, enum.Enum):

@@ -124,7 +124,7 @@ export default function MySchedule() {
                           background: s.status === 'CONFIRMED' ? '#dcfce7' : '#fef3c7',
                           color: s.status === 'CONFIRMED' ? '#166534' : '#92400e',
                         }}>
-                          {s.status === 'CONFIRMED' ? 'Bestaetigt' : s.status}
+                          {s.status === 'CONFIRMED' ? 'Bestaetigt' : s.status === 'SWAPPED' ? 'Getauscht' : s.status}
                         </span>
                       </td>
                     </tr>

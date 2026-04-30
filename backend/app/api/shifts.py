@@ -150,6 +150,8 @@ ACTIVE_TRAVEL_STATUSES = (
     TravelStatus.APPROVED_LEGACY,
 )
 
+ACTIVE_SHIFT_STATUSES = (ShiftStatus.PLANNED, ShiftStatus.CONFIRMED, ShiftStatus.SWAPPED)
+
 
 class DutyPlanCellUpsert(BaseModel):
     employee_id: int
@@ -173,6 +175,49 @@ class DutyPlanEntryResponse(BaseModel):
 class DutyPlanResponse(BaseModel):
     year: int
     entries: list[DutyPlanEntryResponse]
+
+
+def _can_access_department(current_user: Employee, department_id: int | None) -> bool:
+    if is_hr(current_user):
+        return True
+    return is_manager(current_user) and department_id == current_user.department_id
+
+
+def _ensure_plan_access(plan: ShiftPlan, current_user: Employee) -> None:
+    if not _can_access_department(current_user, plan.department_id):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung fuer diesen Dienstplan")
+
+
+def _ensure_plan_editable(plan: ShiftPlan, current_user: Employee) -> None:
+    _ensure_plan_access(plan, current_user)
+    if plan.status == PlanStatus.ARCHIVED:
+        raise HTTPException(status_code=400, detail="Archivierter Plan kann nicht geaendert werden")
+
+
+def _ensure_date_in_plan(plan: ShiftPlan, assignment_date: date) -> None:
+    if assignment_date.year != plan.year or assignment_date.month != plan.month:
+        raise HTTPException(status_code=400, detail="Datum liegt nicht im Dienstplan-Monat")
+
+
+async def _get_assignable_employee(
+    db: AsyncSession,
+    employee_id: int,
+    department_id: int,
+) -> Employee:
+    result = await db.execute(
+        select(Employee).where(Employee.id == employee_id, Employee.is_active == True)
+    )
+    employee = result.scalar_one_or_none()
+    if employee is None:
+        raise HTTPException(status_code=404, detail="Mitarbeiter nicht gefunden")
+    if employee.department_id != department_id:
+        raise HTTPException(status_code=400, detail="Mitarbeiter gehoert nicht zur Plan-Abteilung")
+    return employee
+
+
+def _ensure_template_available(template: ShiftTemplate, department_id: int) -> None:
+    if template.department_id is not None and template.department_id != department_id:
+        raise HTTPException(status_code=400, detail="Schichtvorlage gehoert nicht zur Plan-Abteilung")
 
 
 # === Jahres-Dienstplanung ===
@@ -423,6 +468,10 @@ async def create_plan(
     """Neuen Dienstplan (Entwurf) fuer eine Abteilung/Monat erstellen."""
     if not is_manager(current_user):
         raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    if not _can_access_department(current_user, request.department_id):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung fuer diese Abteilung")
+    if request.month < 1 or request.month > 12:
+        raise HTTPException(status_code=400, detail="Monat muss zwischen 1 und 12 liegen")
 
     # Pruefen ob bereits existiert
     existing = await db.execute(
@@ -461,9 +510,17 @@ async def list_plans(
     current_user: Employee = Depends(get_current_user),
 ):
     """Dienstplaene auflisten."""
+    if not is_manager(current_user):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+
     query = select(ShiftPlan)
-    if department_id:
-        query = query.where(ShiftPlan.department_id == department_id)
+    if is_hr(current_user):
+        if department_id:
+            query = query.where(ShiftPlan.department_id == department_id)
+    else:
+        query = query.where(ShiftPlan.department_id == current_user.department_id)
+        if department_id and department_id != current_user.department_id:
+            raise HTTPException(status_code=403, detail="Keine Berechtigung fuer diese Abteilung")
     if year:
         query = query.where(ShiftPlan.year == year)
     query = query.order_by(ShiftPlan.year.desc(), ShiftPlan.month.desc())
@@ -498,6 +555,7 @@ async def publish_plan(
     plan = result.scalar_one_or_none()
     if plan is None:
         raise HTTPException(status_code=404, detail="Dienstplan nicht gefunden")
+    _ensure_plan_access(plan, current_user)
 
     if plan.status == PlanStatus.PUBLISHED:
         raise HTTPException(status_code=400, detail="Plan ist bereits veroeffentlicht")
@@ -539,8 +597,9 @@ async def assign_shift(
     plan = plan_result.scalar_one_or_none()
     if plan is None:
         raise HTTPException(status_code=404, detail="Dienstplan nicht gefunden")
-    if plan.status == PlanStatus.ARCHIVED:
-        raise HTTPException(status_code=400, detail="Archivierter Plan kann nicht geaendert werden")
+    _ensure_plan_editable(plan, current_user)
+    _ensure_date_in_plan(plan, request.date)
+    await _get_assignable_employee(db, request.employee_id, plan.department_id)
 
     # Schichtvorlage laden
     tmpl_result = await db.execute(
@@ -549,6 +608,7 @@ async def assign_shift(
     template = tmpl_result.scalar_one_or_none()
     if template is None:
         raise HTTPException(status_code=404, detail="Schichtvorlage nicht gefunden")
+    _ensure_template_available(template, plan.department_id)
 
     # Regelwerk pruefen
     validation = await validate_assignment(
@@ -587,6 +647,10 @@ async def assign_shift_bulk(
     plan = plan_result.scalar_one_or_none()
     if plan is None:
         raise HTTPException(status_code=404, detail="Dienstplan nicht gefunden")
+    _ensure_plan_editable(plan, current_user)
+    await _get_assignable_employee(db, request.employee_id, plan.department_id)
+    for assignment_date in request.dates:
+        _ensure_date_in_plan(plan, assignment_date)
 
     tmpl_result = await db.execute(
         select(ShiftTemplate).where(ShiftTemplate.id == request.shift_template_id)
@@ -594,6 +658,7 @@ async def assign_shift_bulk(
     template = tmpl_result.scalar_one_or_none()
     if template is None:
         raise HTTPException(status_code=404, detail="Schichtvorlage nicht gefunden")
+    _ensure_template_available(template, plan.department_id)
 
     results = []
     for d in request.dates:
@@ -631,11 +696,16 @@ async def remove_assignment(
         raise HTTPException(status_code=403, detail="Keine Berechtigung")
 
     result = await db.execute(
-        select(ShiftAssignment).where(ShiftAssignment.id == assignment_id)
+        select(ShiftAssignment)
+        .options(selectinload(ShiftAssignment.plan))
+        .where(ShiftAssignment.id == assignment_id)
     )
     assignment = result.scalar_one_or_none()
     if assignment is None:
         raise HTTPException(status_code=404, detail="Zuweisung nicht gefunden")
+    if assignment.plan is None:
+        raise HTTPException(status_code=404, detail="Dienstplan nicht gefunden")
+    _ensure_plan_editable(assignment.plan, current_user)
 
     assignment.status = ShiftStatus.CANCELLED
 
@@ -650,17 +720,21 @@ async def view_plan(
     current_user: Employee = Depends(get_current_user),
 ):
     """Dienstplan als Kalenderansicht (Tage x Mitarbeiter)."""
+    if not is_manager(current_user):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+
     plan_result = await db.execute(select(ShiftPlan).where(ShiftPlan.id == plan_id))
     plan = plan_result.scalar_one_or_none()
     if plan is None:
         raise HTTPException(status_code=404, detail="Dienstplan nicht gefunden")
+    _ensure_plan_access(plan, current_user)
 
     assign_result = await db.execute(
         select(ShiftAssignment)
         .options(selectinload(ShiftAssignment.employee), selectinload(ShiftAssignment.shift_template))
         .where(
             ShiftAssignment.plan_id == plan_id,
-            ShiftAssignment.status.in_([ShiftStatus.PLANNED, ShiftStatus.CONFIRMED]),
+            ShiftAssignment.status.in_(ACTIVE_SHIFT_STATUSES),
         )
         .order_by(ShiftAssignment.date)
     )
@@ -721,7 +795,7 @@ async def my_schedule(
             ShiftAssignment.employee_id == current_user.id,
             ShiftAssignment.date >= start_date,
             ShiftAssignment.date <= end_date,
-            ShiftAssignment.status.in_([ShiftStatus.PLANNED, ShiftStatus.CONFIRMED]),
+            ShiftAssignment.status.in_(ACTIVE_SHIFT_STATUSES),
         )
         .order_by(ShiftAssignment.date)
     )

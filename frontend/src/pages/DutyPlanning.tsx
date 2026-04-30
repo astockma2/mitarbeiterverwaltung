@@ -129,6 +129,7 @@ const STATUS_LABELS: Record<string, string> = {
   CANCELLED: 'Storniert',
   PLANNED: 'Geplant',
   CONFIRMED: 'Bestaetigt',
+  SWAPPED: 'Getauscht',
   IMPORTED: 'Importiert',
 };
 

@@ -6,7 +6,7 @@ from typing import Optional
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.shift import ShiftAssignment, ShiftTemplate, ShiftRequirement, ShiftStatus
+from app.models.shift import ShiftAssignment, ShiftTemplate, ShiftRequirement, ShiftStatus, ShiftPlan
 
 
 # ArbZG Regeln
@@ -14,6 +14,9 @@ MAX_DAILY_HOURS = 10.0        # Max 10h/Tag (§3 ArbZG)
 MAX_WEEKLY_HOURS = 48.0       # Max 48h/Woche (§3 ArbZG)
 MIN_REST_HOURS = 11.0         # Min 11h Ruhezeit (§5 ArbZG)
 MAX_CONSECUTIVE_DAYS = 6      # Max 6 Tage am Stueck (§9 ArbZG)
+
+
+ACTIVE_SHIFT_STATUSES = (ShiftStatus.PLANNED, ShiftStatus.CONFIRMED, ShiftStatus.SWAPPED)
 
 
 class ValidationResult:
@@ -57,7 +60,7 @@ async def validate_assignment(
         ShiftAssignment.employee_id == employee_id,
         ShiftAssignment.date >= week_start,
         ShiftAssignment.date <= week_end,
-        ShiftAssignment.status.in_([ShiftStatus.PLANNED, ShiftStatus.CONFIRMED]),
+        ShiftAssignment.status.in_(ACTIVE_SHIFT_STATUSES),
     )
     if exclude_assignment_id:
         query = query.where(ShiftAssignment.id != exclude_assignment_id)
@@ -111,13 +114,15 @@ async def _check_rest_time(
     exclude_id: Optional[int] = None,
 ):
     """Prueft die 11h Ruhezeit vor und nach der geplanten Schicht."""
+    new_start, new_end = _shift_window(new_shift, assignment_date)
+
     # Vortag und Folgetag laden
     for delta, label in [(-1, "Vortag"), (1, "Folgetag")]:
         neighbor_date = assignment_date + timedelta(days=delta)
         query = select(ShiftAssignment).where(
             ShiftAssignment.employee_id == employee_id,
             ShiftAssignment.date == neighbor_date,
-            ShiftAssignment.status.in_([ShiftStatus.PLANNED, ShiftStatus.CONFIRMED]),
+            ShiftAssignment.status.in_(ACTIVE_SHIFT_STATUSES),
         )
         if exclude_id:
             query = query.where(ShiftAssignment.id != exclude_id)
@@ -126,16 +131,11 @@ async def _check_rest_time(
         neighbor = neighbor_result.scalar_one_or_none()
 
         if neighbor and neighbor.shift_template:
+            neighbor_start, neighbor_end = _shift_window(neighbor.shift_template, neighbor_date)
             if delta == -1:
-                # Ruhezeit: Ende Vortag -> Start neuer Schicht
-                prev_end = neighbor.shift_template.end_time
-                new_start = new_shift.start_time
-                rest = _calculate_rest_hours(prev_end, new_start, neighbor.shift_template.crosses_midnight)
+                rest = (new_start - neighbor_end).total_seconds() / 3600
             else:
-                # Ruhezeit: Ende neue Schicht -> Start Folgetag
-                new_end = new_shift.end_time
-                next_start = neighbor.shift_template.start_time
-                rest = _calculate_rest_hours(new_end, next_start, new_shift.crosses_midnight)
+                rest = (neighbor_start - new_end).total_seconds() / 3600
 
             if rest < MIN_REST_HOURS:
                 result.add_error(
@@ -144,20 +144,25 @@ async def _check_rest_time(
                 )
 
 
-def _calculate_rest_hours(end_time: time, start_time: time, crosses_midnight: bool) -> float:
-    """Berechnet die Ruhezeit zwischen Schichtende und naechstem Schichtbeginn."""
-    end_minutes = end_time.hour * 60 + end_time.minute
-    start_minutes = start_time.hour * 60 + start_time.minute
+def _shift_window(shift: ShiftTemplate, shift_date: date) -> tuple[datetime, datetime]:
+    """Gibt Start und Ende einer Schicht als echte Datumszeiten zurueck."""
+    start = datetime.combine(shift_date, shift.start_time)
+    end = datetime.combine(shift_date, shift.end_time)
+    if shift.crosses_midnight:
+        end += timedelta(days=1)
+    return start, end
 
-    if crosses_midnight:
-        # Schicht endet am naechsten Tag
-        rest_minutes = start_minutes - end_minutes + 1440
-    elif start_minutes > end_minutes:
-        rest_minutes = start_minutes - end_minutes
-    else:
-        rest_minutes = (1440 - end_minutes) + start_minutes
 
-    return rest_minutes / 60
+def _calculate_rest_hours(
+    previous_shift: ShiftTemplate,
+    previous_date: date,
+    next_shift: ShiftTemplate,
+    next_date: date,
+) -> float:
+    """Berechnet die Ruhezeit zwischen zwei konkreten Schichten."""
+    _, previous_end = _shift_window(previous_shift, previous_date)
+    next_start, _ = _shift_window(next_shift, next_date)
+    return (next_start - previous_end).total_seconds() / 3600
 
 
 async def _check_consecutive_days(
@@ -176,7 +181,7 @@ async def _check_consecutive_days(
         query = select(ShiftAssignment).where(
             ShiftAssignment.employee_id == employee_id,
             ShiftAssignment.date == check_date,
-            ShiftAssignment.status.in_([ShiftStatus.PLANNED, ShiftStatus.CONFIRMED]),
+            ShiftAssignment.status.in_(ACTIVE_SHIFT_STATUSES),
         )
         if exclude_id:
             query = query.where(ShiftAssignment.id != exclude_id)
@@ -192,7 +197,7 @@ async def _check_consecutive_days(
         query = select(ShiftAssignment).where(
             ShiftAssignment.employee_id == employee_id,
             ShiftAssignment.date == check_date,
-            ShiftAssignment.status.in_([ShiftStatus.PLANNED, ShiftStatus.CONFIRMED]),
+            ShiftAssignment.status.in_(ACTIVE_SHIFT_STATUSES),
         )
         if exclude_id:
             query = query.where(ShiftAssignment.id != exclude_id)
@@ -232,9 +237,12 @@ async def check_staffing(
 
     # Zuweisungen laden
     assign_result = await db.execute(
-        select(ShiftAssignment).where(
+        select(ShiftAssignment)
+        .join(ShiftPlan, ShiftAssignment.plan_id == ShiftPlan.id)
+        .where(
+            ShiftPlan.department_id == department_id,
             ShiftAssignment.date == check_date,
-            ShiftAssignment.status.in_([ShiftStatus.PLANNED, ShiftStatus.CONFIRMED]),
+            ShiftAssignment.status.in_(ACTIVE_SHIFT_STATUSES),
         )
     )
     assignments = assign_result.scalars().all()

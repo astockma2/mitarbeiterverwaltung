@@ -1,4 +1,5 @@
 from app.models.planning import PlanningMarkerKind
+from app.api.planning import _normalize_duty_entry_code
 from app.services.planning_import import normalize_name, split_code
 
 
@@ -21,3 +22,8 @@ def test_split_school_code_is_information_marker():
     assert token.label == "Schule Azubi"
     assert token.kind == PlanningMarkerKind.INFO
     assert token.absence_type is None
+
+
+def test_planning_calendar_normalizes_legacy_dienstreise_code():
+    assert _normalize_duty_entry_code("Dr") == "DR"
+    assert _normalize_duty_entry_code("su") == "su"

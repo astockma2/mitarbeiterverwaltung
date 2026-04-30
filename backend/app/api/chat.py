@@ -10,7 +10,7 @@ from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, WebSocket, WebSocketDisconnect, Query
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -19,7 +19,14 @@ from app.auth.jwt import get_current_user
 from app.config import get_settings
 from app.database import async_session, get_db
 from app.models.employee import Employee
-from app.models.message import Conversation, ConversationMember, DeviceToken, Message
+from app.models.message import (
+    Conversation,
+    ConversationMember,
+    DeviceToken,
+    MAX_MESSAGE_LENGTH,
+    Message,
+    MessageCreate,
+)
 from app.services.push_notification import send_push_notification
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
@@ -88,12 +95,6 @@ class ConversationUpdate(BaseModel):
 class MembersUpdate(BaseModel):
     add: list[int] = []
     remove: list[int] = []
-
-MAX_MESSAGE_LENGTH = 10_000
-
-class MessageCreate(BaseModel):
-    content: str = Field(..., min_length=1, max_length=MAX_MESSAGE_LENGTH)
-    message_type: str = "TEXT"
 
 class DeviceTokenCreate(BaseModel):
     fcm_token: str

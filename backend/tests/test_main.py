@@ -23,7 +23,8 @@ async def test_global_exception_handler_gibt_keine_internen_details_zurueck():
     test_app.add_exception_handler(Exception, global_exception_handler)
 
     async with AsyncClient(
-        transport=ASGITransport(app=test_app), base_url="http://test"
+        transport=ASGITransport(app=test_app, raise_app_exceptions=False),
+        base_url="http://test",
     ) as client:
         response = await client.get("/trigger-error")
 
