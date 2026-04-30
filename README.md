@@ -8,9 +8,19 @@ Tickets und einem integrierten Support-Bot.
 - Status: produktiv im Einsatz
 - Stack: FastAPI, PostgreSQL, Redis, React 19, Flutter
 
+## Versionstabelle
+
+| Version | Datum | Inhalt |
+|---------|-------|--------|
+| `1.5.3` | 30.04.2026 | Dienstplanung per Klick/gedrueckter Maustaste, Plus-Dienstcodes, Abwesenheitskartei im Bereich Abwesenheiten, neues APK |
+| `1.5.2` | 30.04.2026 | Dienstplanung und Support-Bot gehaertet |
+| `1.5.1` | 26.04.2026 | Jahres-Dienstplan mit IT-Team-Beispieldaten 2026 |
+
 ## Aktuell
 
-- Jahres-Dienstplanung unter `/shift-plans` mit farbigen Tagescodes, Drag-Planung und CSV-Export
+- Jahres-Dienstplanung unter `/shift-plans` mit farbigen Tagescodes, Klick-/Drag-Planung und CSV-Export
+- Dienste werden per Klick oder bei gedrueckter linker Maustaste eingetragen; Mouseover allein schreibt nichts
+- Kartei Abwesenheiten und Dienstreise-Antraege liegen im Bereich `/absences`
 - Serverseitige Speicherung ueber `/api/v1/shifts/duty-plan`
 - Bisherige Monatsplanung weiter unter `/shift-plans/monthly`
 

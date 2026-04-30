@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.3] - 2026-04-30
+
+### Dienstplanung und Abwesenheiten
+- Jahres- und Monatsplanung sind fuer berechtigte Rollen direkt per Klick editierbar; Drag-and-Paint schreibt nur noch bei gedrueckter linker Maustaste.
+- Reines Mouseover setzt keine Dienste mehr.
+- Dienstcodes `B+`, `H+`, `I`, `I+`, `M` und `M+` sind in UI, API und Import konsistent unterstuetzt.
+- Die Kartei Abwesenheiten mit Dienstreise-Antrag wurde aus der Dienstplanung in den Bereich Abwesenheiten verschoben.
+
+### Stabilitaet
+- Dienstplan-API, Import-Normalisierung und Support-Bot wurden gegen fehlerhafte Eingaben gehaertet.
+- Release-APK und Backend-Version wurden auf `1.5.3` angehoben.
+
 ## [1.5.1] - 2026-04-26
 
 ### Jahres-Dienstplan — IT-Team-Beispieldaten 2026

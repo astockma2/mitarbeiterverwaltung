@@ -1,7 +1,7 @@
 # Benutzerhandbuch — Mitarbeiterverwaltung (MVA)
 ### Ilm-Kreis-Kliniken
 
-**Version:** 1.0 · **Stand:** April 2026  
+**Version:** 1.5.3 · **Stand:** 30.04.2026
 **Zielgruppe:** Alle Mitarbeiterinnen und Mitarbeiter der Ilm-Kreis-Kliniken
 
 ---
@@ -188,6 +188,10 @@ In der Tabelle unter „Abwesenheiten" sehen Sie alle Ihre Anträge mit ihrem ak
 
 [Screenshot: Abwesenheitsliste mit farbigen Status-Badges]
 
+### 3.6 Kartei Abwesenheiten und Dienstreisen
+
+Die Kartei Abwesenheiten befindet sich im Bereich **„Abwesenheiten"**. Dort sehen berechtigte Nutzer die Summen fuer Urlaub, geplanten Urlaub, AZA und Dienstreisen. Dienstreise-Antraege werden ebenfalls hier erstellt und verwaltet.
+
 ---
 
 ## 4. Dienstplan
@@ -309,12 +313,17 @@ Die Seite **Dienstplanung** startet mit der Jahresübersicht. Sie eignet sich f�
    - **U** = Urlaub
    - **Ug** = Urlaub geplant
    - **B** = Bereitschaft
+   - **B+** = Bereitschaft plus
    - **H** = Hotlinedienst
+   - **H+** = Hotlinedienst plus
+   - **I / I+** = Dienstreise / Dienstreise plus
+   - **M / M+** = Mail-/Sonderdienst
    - **S** = Schulung
    - **T** = Teammeeting
-4. Ziehen Sie mit gedrückter Maustaste über die Zellen, um den Code für mehrere Tage zu setzen.
-5. Nutzen Sie **Leeren** oder den Rechtsklick auf eine Zelle, um Einträge zu entfernen.
-6. Verwenden Sie die Suche, um einzelne Mitarbeiter oder Abteilungen schneller zu finden.
+4. Klicken Sie eine Zelle an, um den Code fuer genau diesen Tag zu setzen.
+5. Ziehen Sie mit gedrueckter linker Maustaste ueber weitere Zellen, um den Code fuer mehrere Tage zu setzen. Reines Mouseover ohne gedrueckte Maustaste traegt nichts ein.
+6. Nutzen Sie **Leeren** oder den Rechtsklick auf eine Zelle, um Einträge zu entfernen.
+7. Verwenden Sie die Suche, um einzelne Mitarbeiter oder Abteilungen schneller zu finden.
 
 Die Planung speichert jede Änderung serverseitig. Die Spalten **Rest 2025** und **Jahr** helfen bei der Urlaubsübersicht; der CSV-Export erstellt eine Excel-lesbare Jahresdatei.
 
