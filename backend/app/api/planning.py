@@ -137,14 +137,18 @@ ABSENCE_CELL_CODES: dict[str, tuple[str, AbsenceType, AbsenceStatus, str]] = {
 
 MARKER_CELL_CODES: dict[str, tuple[str, PlanningMarkerKind, str]] = {
     "B": ("Bereitschaft", PlanningMarkerKind.DUTY, "#C2410C"),
+    "B+": ("Bereitschaft plus", PlanningMarkerKind.DUTY, "#C2410C"),
     "H": ("Hotlinedienst", PlanningMarkerKind.DUTY, "#16A34A"),
+    "H+": ("Hotlinedienst plus", PlanningMarkerKind.DUTY, "#16A34A"),
     "T": ("Teammeeting", PlanningMarkerKind.INFO, "#1D4ED8"),
     "S": ("Schule Azubi", PlanningMarkerKind.INFO, "#2563EB"),
     "I": ("Ilmenau", PlanningMarkerKind.DUTY, "#F97316"),
+    "I+": ("Ilmenau plus", PlanningMarkerKind.DUTY, "#F97316"),
     "M": ("MVZ", PlanningMarkerKind.DUTY, "#EAB308"),
+    "M+": ("MVZ plus", PlanningMarkerKind.DUTY, "#EAB308"),
 }
 
-DUTY_CELL_CODES = {"D", "B", "H", "I", "M"}
+DUTY_CELL_CODES = {"D", "B", "B+", "H", "H+", "I", "I+", "M", "M+"}
 
 DUTY_ENTRY_EVENTS: dict[str, tuple[str, str, str]] = {
     "D": ("Normaldienst", "shift", "#2563EB"),
@@ -153,11 +157,15 @@ DUTY_ENTRY_EVENTS: dict[str, tuple[str, str, str]] = {
     "A": ("Arbeitszeitausgleich", "absence", "#FB7185"),
     "DR": ("Dienstreise", "absence", "#65A30D"),
     "B": ("Bereitschaft", "duty", "#C2410C"),
+    "B+": ("Bereitschaft plus", "duty", "#C2410C"),
     "H": ("Hotlinedienst", "duty", "#16A34A"),
+    "H+": ("Hotlinedienst plus", "duty", "#16A34A"),
     "T": ("Teammeeting", "info", "#1D4ED8"),
     "S": ("Schule Azubi", "info", "#2563EB"),
     "I": ("Ilmenau", "duty", "#F97316"),
+    "I+": ("Ilmenau plus", "duty", "#F97316"),
     "M": ("MVZ", "duty", "#EAB308"),
+    "M+": ("MVZ plus", "duty", "#EAB308"),
     "K": ("Kur", "absence", "#FB923C"),
     "su": ("Security Update Day", "info", "#F43F5E"),
     "Ez": ("Elternzeit", "absence", "#D97706"),
@@ -544,11 +552,15 @@ def _normalize_cell_code(raw_code: Optional[str]) -> str | None:
         "a": "A",
         "dr": "DR",
         "b": "B",
+        "b+": "B+",
         "h": "H",
+        "h+": "H+",
         "t": "T",
         "s": "S",
         "i": "I",
+        "i+": "I+",
         "m": "M",
+        "m+": "M+",
     }
     return lookup.get(code.lower(), code)
 
@@ -1013,14 +1025,19 @@ async def _add_marker_events(
         )
     )
     for marker in result.scalars().all():
+        code = _normalize_duty_entry_code(marker.code)
+        label, event_type, color = DUTY_ENTRY_EVENTS.get(
+            code,
+            (marker.label, marker.kind.value.lower(), marker.color),
+        )
         by_employee_day[marker.employee_id][marker.date].append(
             PlanningEventResponse(
                 id=marker.id,
-                type=marker.kind.value.lower(),
-                code=marker.code,
-                label=marker.label,
+                type=event_type,
+                code=code,
+                label=label,
                 status="IMPORTED",
-                color=marker.color,
+                color=color,
                 source=marker.source,
             )
         )

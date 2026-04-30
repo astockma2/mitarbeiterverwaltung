@@ -76,9 +76,21 @@ TOKEN_MAP: dict[str, ImportedToken] = {
         kind=PlanningMarkerKind.DUTY,
         color="#C2410C",
     ),
+    "B+": ImportedToken(
+        "B+",
+        "Bereitschaft plus",
+        kind=PlanningMarkerKind.DUTY,
+        color="#C2410C",
+    ),
     "I": ImportedToken(
         "I",
         "Ilmenau",
+        kind=PlanningMarkerKind.DUTY,
+        color="#F97316",
+    ),
+    "I+": ImportedToken(
+        "I+",
+        "Ilmenau plus",
         kind=PlanningMarkerKind.DUTY,
         color="#F97316",
     ),
@@ -88,9 +100,21 @@ TOKEN_MAP: dict[str, ImportedToken] = {
         kind=PlanningMarkerKind.DUTY,
         color="#16A34A",
     ),
+    "H+": ImportedToken(
+        "H+",
+        "Hotlinedienst plus",
+        kind=PlanningMarkerKind.DUTY,
+        color="#16A34A",
+    ),
     "M": ImportedToken(
         "M",
         "MVZ",
+        kind=PlanningMarkerKind.DUTY,
+        color="#EAB308",
+    ),
+    "M+": ImportedToken(
+        "M+",
+        "MVZ plus",
         kind=PlanningMarkerKind.DUTY,
         color="#EAB308",
     ),

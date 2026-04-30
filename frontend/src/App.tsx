@@ -43,7 +43,7 @@ export default function App() {
             <Route path="/" element={<Dashboard user={user} isHR={isHR} />} />
             <Route path="/time" element={<TimeTracking />} />
             <Route path="/schedule" element={<MySchedule />} />
-            <Route path="/absences" element={<Absences isManager={isManager} />} />
+            <Route path="/absences" element={<Absences isManager={isManager} isHR={isHR} />} />
             <Route path="/chat" element={<Chat userId={user.id} />} />
             <Route path="/tickets" element={<Tickets isHR={isHR} />} />
             {isHR && <Route path="/employees" element={<Employees />} />}

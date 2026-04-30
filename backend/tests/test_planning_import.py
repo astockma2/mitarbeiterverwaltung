@@ -12,6 +12,12 @@ def test_split_composite_code_into_structured_tokens():
     assert [token.code for token in tokens] == ["B", "H", "T"]
 
 
+def test_split_plus_duty_code_is_structured_duty_marker():
+    token = split_code("b+")[0]
+    assert token.code == "B+"
+    assert token.kind == PlanningMarkerKind.DUTY
+
+
 def test_split_dienstreise_variants():
     assert split_code("dr")[0].code == "DR"
     assert split_code("DR")[0].is_travel is True
@@ -27,3 +33,4 @@ def test_split_school_code_is_information_marker():
 def test_planning_calendar_normalizes_legacy_dienstreise_code():
     assert _normalize_duty_entry_code("Dr") == "DR"
     assert _normalize_duty_entry_code("su") == "su"
+    assert _normalize_duty_entry_code("h+") == "H+"

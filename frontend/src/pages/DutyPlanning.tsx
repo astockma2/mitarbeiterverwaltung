@@ -1,26 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, FormEvent } from 'react';
+import type { CSSProperties, MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
 import {
   CalendarDays,
-  Check,
   ChevronLeft,
   ChevronRight,
   ClipboardCopy,
   Eraser,
   Mail,
-  Plane,
   RefreshCw,
   Table2,
-  X,
 } from 'lucide-react';
 import Card, { Badge } from '../components/Card';
 import {
-  createTravelRequest,
   getDepartments,
-  getPendingTravelRequests,
   getPlanningCalendar,
-  reviewTravelRequest,
   savePlanningCells,
 } from '../services/api';
 
@@ -44,7 +38,7 @@ const DAY_WIDTH = 34;
 const NAME_WIDTH = 190;
 
 type ViewMode = 'year' | 'month';
-type PlanningToolCode = 'D' | 'B' | 'H' | 'T' | 'S' | 'U' | 'Ug' | 'A' | 'DR' | 'CLEAR';
+type PlanningToolCode = 'D' | 'B' | 'B+' | 'H' | 'H+' | 'I' | 'I+' | 'M' | 'M+' | 'T' | 'S' | 'U' | 'Ug' | 'A' | 'DR' | 'CLEAR';
 
 type PlanningEvent = {
   id: number;
@@ -77,17 +71,6 @@ type PlanningCalendar = {
   employees: PlanningEmployee[];
 };
 
-type TravelRequest = {
-  id: number;
-  employee_id: number;
-  employee_name?: string | null;
-  start_date: string;
-  end_date: string;
-  destination: string;
-  purpose: string;
-  status: string;
-};
-
 type Department = {
   id: number;
   name: string;
@@ -108,7 +91,13 @@ type PlanningTool = {
 const PLANNING_TOOLS: PlanningTool[] = [
   { code: 'D', label: 'Dienst', color: '#2563EB', tone: '#DBEAFE' },
   { code: 'B', label: 'Bereit', color: '#C2410C', tone: '#FFEDD5' },
+  { code: 'B+', label: 'Bereit plus', color: '#C2410C', tone: '#FFEDD5' },
   { code: 'H', label: 'Hotline', color: '#16A34A', tone: '#DCFCE7' },
+  { code: 'H+', label: 'Hotline plus', color: '#16A34A', tone: '#DCFCE7' },
+  { code: 'I', label: 'Ilmenau', color: '#F97316', tone: '#FFEDD5' },
+  { code: 'I+', label: 'Ilmenau plus', color: '#F97316', tone: '#FFEDD5' },
+  { code: 'M', label: 'MVZ', color: '#EAB308', tone: '#FEF9C3' },
+  { code: 'M+', label: 'MVZ plus', color: '#EAB308', tone: '#FEF9C3' },
   { code: 'T', label: 'Team', color: '#1D4ED8', tone: '#DBEAFE' },
   { code: 'S', label: 'Schule', color: '#2563EB', tone: '#E0E7FF' },
   { code: 'U', label: 'Urlaub', color: '#D97706', tone: '#FEF3C7' },
@@ -191,23 +180,12 @@ export default function DutyPlanning({ isHR, isManager }: Props) {
   const [departmentId, setDepartmentId] = useState('');
   const [calendar, setCalendar] = useState<PlanningCalendar | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [pendingTravel, setPendingTravel] = useState<TravelRequest[]>([]);
   const [selectedTool, setSelectedTool] = useState<PlanningToolCode>('D');
   const [painting, setPainting] = useState(false);
   const [paintPreview, setPaintPreview] = useState<Map<string, string | null>>(new Map());
   const paintBufferRef = useRef<Map<string, { employee_id: number; date: string; code: string | null }>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [travelForm, setTravelForm] = useState({
-    employee_id: '',
-    start_date: dateKey(today.getFullYear(), today.getMonth() + 1, today.getDate()),
-    end_date: dateKey(today.getFullYear(), today.getMonth() + 1, today.getDate()),
-    destination: '',
-    purpose: '',
-    cost_center: '',
-    transport_type: '',
-    estimated_costs: '',
-  });
 
   const range = useMemo(() => getRange(mode, year, month), [mode, year, month]);
 
@@ -220,12 +198,8 @@ export default function DutyPlanning({ isHR, isManager }: Props) {
         end_date: range.end,
       };
       if (departmentId) params.department_id = departmentId;
-      const [calendarResponse, pendingResponse] = await Promise.all([
-        getPlanningCalendar(params),
-        getPendingTravelRequests().catch(() => ({ data: [] })),
-      ]);
+      const calendarResponse = await getPlanningCalendar(params);
       setCalendar(calendarResponse.data as PlanningCalendar);
-      setPendingTravel(pendingResponse.data as TravelRequest[]);
     } catch (loadError: any) {
       setError(loadError.response?.data?.detail || 'Planung konnte nicht geladen werden');
     } finally {
@@ -247,7 +221,7 @@ export default function DutyPlanning({ isHR, isManager }: Props) {
   const employees = calendar?.employees || [];
   const days = calendar?.days || [];
   const monthHeaders = useMemo(() => groupMonthHeaders(days), [days]);
-  const canEditMonth = isManager && mode === 'month';
+  const canEditPlanning = isManager;
 
   const setPrevious = () => {
     if (mode === 'year') {
@@ -282,41 +256,8 @@ export default function DutyPlanning({ isHR, isManager }: Props) {
     setMode('month');
   };
 
-  const submitTravel = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError('');
-    try {
-      await createTravelRequest({
-        employee_id: travelForm.employee_id ? Number(travelForm.employee_id) : undefined,
-        start_date: travelForm.start_date,
-        end_date: travelForm.end_date,
-        destination: travelForm.destination,
-        purpose: travelForm.purpose,
-        cost_center: travelForm.cost_center || undefined,
-        transport_type: travelForm.transport_type || undefined,
-        estimated_costs: travelForm.estimated_costs ? Number(travelForm.estimated_costs) : null,
-      });
-      setTravelForm((current) => ({
-        ...current,
-        destination: '',
-        purpose: '',
-        cost_center: '',
-        transport_type: '',
-        estimated_costs: '',
-      }));
-      await load();
-    } catch (submitError: any) {
-      setError(submitError.response?.data?.detail || 'Dienstreise konnte nicht gespeichert werden');
-    }
-  };
-
-  const reviewTravel = async (id: number, approved: boolean) => {
-    await reviewTravelRequest(id, { approved, final_approval: isHR });
-    await load();
-  };
-
   const paintCell = useCallback((employee: PlanningEmployee, day: PlanningDay) => {
-    if (!canEditMonth) return;
+    if (!canEditPlanning) return;
     const code = selectedTool === 'CLEAR' ? null : selectedTool;
     const key = `${employee.id}:${day.date}`;
     paintBufferRef.current.set(key, { employee_id: employee.id, date: day.date, code });
@@ -325,15 +266,15 @@ export default function DutyPlanning({ isHR, isManager }: Props) {
       next.set(key, code);
       return next;
     });
-  }, [canEditMonth, selectedTool]);
+  }, [canEditPlanning, selectedTool]);
 
   const beginPaint = useCallback((employee: PlanningEmployee, day: PlanningDay) => {
-    if (!canEditMonth) return;
+    if (!canEditPlanning) return;
     paintBufferRef.current = new Map();
     setPaintPreview(new Map());
     setPainting(true);
     paintCell(employee, day);
-  }, [canEditMonth, paintCell]);
+  }, [canEditPlanning, paintCell]);
 
   const finishPaint = useCallback(async () => {
     if (!painting) return;
@@ -442,7 +383,6 @@ export default function DutyPlanning({ isHR, isManager }: Props) {
           <Metric label="Mitarbeiter" value={employees.length} />
           <Metric label="Eintraege" value={totalEvents} />
           <Metric label="Dienstreisen" value={totalTravel} />
-          <Metric label="Offene Reisen" value={pendingTravel.length} />
         </div>
       </Card>
 
@@ -455,7 +395,7 @@ export default function DutyPlanning({ isHR, isManager }: Props) {
               <div style={{ fontWeight: 700, color: '#1e293b' }}>
                 {mode === 'year' ? 'Jahresansicht' : 'Monatsansicht'}
               </div>
-              {canEditMonth ? (
+              {canEditPlanning ? (
                 <PlanningToolbox selectedTool={selectedTool} onSelect={setSelectedTool} />
               ) : (
                 <Legend />
@@ -468,7 +408,8 @@ export default function DutyPlanning({ isHR, isManager }: Props) {
               monthHeaders={monthHeaders}
               loading={loading}
               onOpenMonth={openMonth}
-              canEdit={canEditMonth}
+              canEdit={canEditPlanning}
+              isPainting={painting}
               paintPreview={paintPreview}
               onBeginPaint={beginPaint}
               onPaintCell={paintCell}
@@ -477,110 +418,6 @@ export default function DutyPlanning({ isHR, isManager }: Props) {
         </div>
 
         <aside style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 280 }}>
-          <Card title="Kartei Abwesenheiten">
-            <AbsenceSummary calendar={calendar} />
-            <div style={cardSubheadingStyle}>Dienstreise</div>
-            <form onSubmit={submitTravel} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <select
-                value={travelForm.employee_id}
-                onChange={(event) => setTravelForm((current) => ({ ...current, employee_id: event.target.value }))}
-                style={inputStyle}
-              >
-                <option value="">Eigene Dienstreise</option>
-                {employees.map((employee) => (
-                  <option key={employee.id} value={employee.id}>{employee.name}</option>
-                ))}
-              </select>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <input
-                  type="date"
-                  value={travelForm.start_date}
-                  onChange={(event) => setTravelForm((current) => ({ ...current, start_date: event.target.value }))}
-                  style={inputStyle}
-                  required
-                />
-                <input
-                  type="date"
-                  value={travelForm.end_date}
-                  onChange={(event) => setTravelForm((current) => ({ ...current, end_date: event.target.value }))}
-                  style={inputStyle}
-                  required
-                />
-              </div>
-              <input
-                value={travelForm.destination}
-                onChange={(event) => setTravelForm((current) => ({ ...current, destination: event.target.value }))}
-                placeholder="Ziel"
-                style={inputStyle}
-                required
-              />
-              <input
-                value={travelForm.purpose}
-                onChange={(event) => setTravelForm((current) => ({ ...current, purpose: event.target.value }))}
-                placeholder="Anlass"
-                style={inputStyle}
-                required
-              />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <input
-                  value={travelForm.cost_center}
-                  onChange={(event) => setTravelForm((current) => ({ ...current, cost_center: event.target.value }))}
-                  placeholder="Kostenstelle"
-                  style={inputStyle}
-                />
-                <input
-                  type="number"
-                  value={travelForm.estimated_costs}
-                  onChange={(event) => setTravelForm((current) => ({ ...current, estimated_costs: event.target.value }))}
-                  placeholder="Kosten"
-                  style={inputStyle}
-                />
-              </div>
-              <input
-                value={travelForm.transport_type}
-                onChange={(event) => setTravelForm((current) => ({ ...current, transport_type: event.target.value }))}
-                placeholder="Verkehrsmittel"
-                style={inputStyle}
-              />
-              <button type="submit" style={primaryButtonStyle}>
-                <Plane size={16} />
-                Beantragen
-              </button>
-            </form>
-          </Card>
-
-          <Card title={`Offene Dienstreisen (${pendingTravel.length})`}>
-            {pendingTravel.length === 0 ? (
-              <div style={{ color: '#94a3b8', fontSize: 13, padding: '8px 0' }}>
-                Keine offenen Antraege
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {pendingTravel.map((travel) => (
-                  <div key={travel.id} style={pendingTravelStyle}>
-                    <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
-                      {travel.employee_name || `Mitarbeiter ${travel.employee_id}`}
-                    </div>
-                    <div style={{ color: '#64748b', fontSize: 12 }}>
-                      {travel.start_date} bis {travel.end_date}
-                    </div>
-                    <div style={{ color: '#334155', fontSize: 12, marginTop: 2 }}>
-                      {travel.destination}
-                    </div>
-                    <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                      <button onClick={() => void reviewTravel(travel.id, true)} style={approveButtonStyle}>
-                        <Check size={14} />
-                      </button>
-                      <button onClick={() => void reviewTravel(travel.id, false)} style={rejectButtonStyle}>
-                        <X size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-
           <ReadinessMailCard calendar={calendar} year={year} month={month} />
         </aside>
       </div>
@@ -596,6 +433,7 @@ function PlanningTable({
   loading,
   onOpenMonth,
   canEdit,
+  isPainting,
   paintPreview,
   onBeginPaint,
   onPaintCell,
@@ -607,6 +445,7 @@ function PlanningTable({
   loading: boolean;
   onOpenMonth: (day: string) => void;
   canEdit: boolean;
+  isPainting: boolean;
   paintPreview: Map<string, string | null>;
   onBeginPaint: (employee: PlanningEmployee, day: PlanningDay) => void;
   onPaintCell: (employee: PlanningEmployee, day: PlanningDay) => void;
@@ -687,7 +526,9 @@ function PlanningTable({
                   draftCode={paintPreview.get(`${employee.id}:${day.date}`)}
                   canEdit={canEdit}
                   onMouseDown={() => onBeginPaint(employee, day)}
-                  onMouseEnter={() => onPaintCell(employee, day)}
+                  onMouseEnter={(event) => {
+                    if (isPainting && event.buttons === 1) onPaintCell(employee, day);
+                  }}
                 />
               ))}
             </tr>
@@ -718,7 +559,7 @@ function CalendarCell({
   draftCode?: string | null;
   canEdit: boolean;
   onMouseDown: () => void;
-  onMouseEnter: () => void;
+  onMouseEnter: (event: MouseEvent<HTMLTableCellElement>) => void;
 }) {
   const previewEvent = draftCode === undefined ? null : previewPlanningEvent(draftCode);
   const events = previewEvent ? [previewEvent] : draftCode === null ? [] : day.events;
@@ -729,12 +570,12 @@ function CalendarCell({
   return (
     <td
       onMouseDown={(event) => {
-        if (!canEdit) return;
+        if (!canEdit || event.button !== 0) return;
         event.preventDefault();
         onMouseDown();
       }}
-      onMouseEnter={() => {
-        if (canEdit) onMouseEnter();
+      onMouseEnter={(event) => {
+        if (canEdit) onMouseEnter(event);
       }}
       title={events.map(eventTitle).join('\n')}
       style={{
@@ -787,7 +628,7 @@ function previewPlanningEvent(code: string | null): PlanningEvent | null {
   if (code === null) return null;
   const tool = TOOL_BY_CODE[code as PlanningToolCode];
   if (!tool) return null;
-  const type = code === 'D' ? 'shift' : ['U', 'Ug', 'A', 'DR'].includes(code) ? 'absence' : ['B', 'H'].includes(code) ? 'duty' : 'info';
+  const type = code === 'D' ? 'shift' : ['U', 'Ug', 'A', 'DR'].includes(code) ? 'absence' : ['B', 'B+', 'H', 'H+', 'I', 'I+', 'M', 'M+'].includes(code) ? 'duty' : 'info';
   return {
     id: -1,
     type,
@@ -828,40 +669,6 @@ function PlanningToolbox({
           </button>
         );
       })}
-    </div>
-  );
-}
-
-function AbsenceSummary({ calendar }: { calendar: PlanningCalendar | null }) {
-  const counts = useMemo(() => {
-    const initial: Record<string, number> = { U: 0, Ug: 0, A: 0, DR: 0 };
-    for (const employee of calendar?.employees || []) {
-      for (const day of employee.days) {
-        for (const event of day.events) {
-          if (event.type === 'absence' && initial[event.code] !== undefined) {
-            initial[event.code] += 1;
-          }
-        }
-      }
-    }
-    return initial;
-  }, [calendar]);
-
-  return (
-    <div style={absenceSummaryStyle}>
-      <SummaryPill label="Urlaub" value={counts.U} color="#D97706" />
-      <SummaryPill label="Geplant" value={counts.Ug} color="#0EA5E9" />
-      <SummaryPill label="AZA" value={counts.A} color="#E11D48" />
-      <SummaryPill label="Reisen" value={counts.DR} color="#65A30D" />
-    </div>
-  );
-}
-
-function SummaryPill({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div style={{ ...summaryPillStyle, borderColor: `${color}55`, background: `${color}12` }}>
-      <span style={{ color }}>{label}</span>
-      <strong style={{ color: '#0f172a' }}>{value}</strong>
     </div>
   );
 }
@@ -1149,32 +956,6 @@ const toolButtonStyle: CSSProperties = {
   padding: 0,
 };
 
-const cardSubheadingStyle: CSSProperties = {
-  margin: '12px 0 8px',
-  fontSize: 13,
-  fontWeight: 800,
-  color: '#0f172a',
-};
-
-const absenceSummaryStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 8,
-  marginBottom: 8,
-};
-
-const summaryPillStyle: CSSProperties = {
-  minHeight: 42,
-  border: '1px solid #e2e8f0',
-  borderRadius: 8,
-  padding: '7px 9px',
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  fontSize: 12,
-  fontWeight: 800,
-};
-
 const readinessWeekStyle: CSSProperties = {
   border: '1px solid #e2e8f0',
   borderRadius: 8,
@@ -1238,22 +1019,6 @@ const secondaryButtonStyle: CSSProperties = {
   textDecoration: 'none',
 };
 
-const primaryButtonStyle: CSSProperties = {
-  minHeight: 36,
-  border: 'none',
-  borderRadius: 8,
-  background: '#2563eb',
-  color: '#ffffff',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 8,
-  padding: '0 12px',
-  cursor: 'pointer',
-  fontSize: 13,
-  fontWeight: 700,
-};
-
 const selectStyle: CSSProperties = {
   height: 36,
   border: '1px solid #cbd5e1',
@@ -1264,16 +1029,6 @@ const selectStyle: CSSProperties = {
   fontSize: 13,
 };
 
-const inputStyle: CSSProperties = {
-  minHeight: 36,
-  border: '1px solid #cbd5e1',
-  borderRadius: 8,
-  padding: '0 10px',
-  fontSize: 13,
-  boxSizing: 'border-box',
-  width: '100%',
-};
-
 const errorStyle: CSSProperties = {
   marginBottom: 12,
   padding: '10px 12px',
@@ -1281,27 +1036,4 @@ const errorStyle: CSSProperties = {
   background: '#fee2e2',
   color: '#991b1b',
   fontSize: 13,
-};
-
-const pendingTravelStyle: CSSProperties = {
-  border: '1px solid #e2e8f0',
-  borderRadius: 8,
-  padding: 10,
-  background: '#f8fafc',
-};
-
-const approveButtonStyle: CSSProperties = {
-  ...secondaryButtonStyle,
-  minHeight: 30,
-  width: 34,
-  padding: 0,
-  color: '#16a34a',
-};
-
-const rejectButtonStyle: CSSProperties = {
-  ...secondaryButtonStyle,
-  minHeight: 30,
-  width: 34,
-  padding: 0,
-  color: '#dc2626',
 };
